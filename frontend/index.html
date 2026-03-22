@@ -8,7 +8,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <style>
-/* ── Reset & Base ── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#0f0f13;
@@ -25,11 +24,11 @@
 }
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow:hidden}
 
-/* ── Lobby ── */
 #lobby{
   position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
-  background:var(--bg);z-index:1000;
+  background:var(--bg);z-index:1000;transition:opacity .3s;
 }
+#lobby.hidden{opacity:0;pointer-events:none;}
 #lobby::before{
   content:'';position:absolute;inset:0;
   background:radial-gradient(ellipse 600px 400px at 60% 40%,rgba(108,99,255,.08) 0%,transparent 70%),
@@ -74,15 +73,17 @@ input:focus{border-color:var(--accent)}
 .tab-panel{display:none}
 .tab-panel.active{display:block}
 
-/* ── App Layout ── */
-#app{display:none;height:100vh;flex-direction:column}
-#app.visible{display:flex}
+/* App */
+#app{
+  position:fixed;inset:0;display:flex;flex-direction:column;
+  visibility:hidden;
+}
+#app.visible{visibility:visible}
 
-/* ── Toolbar ── */
 #toolbar{
   display:flex;align-items:center;gap:6px;padding:8px 12px;
   background:var(--surface);border-bottom:1px solid var(--border);
-  flex-wrap:wrap;position:relative;z-index:100;
+  flex-wrap:wrap;position:relative;z-index:100;flex-shrink:0;
 }
 .tool-group{display:flex;align-items:center;gap:3px;padding:0 8px;border-right:1px solid var(--border)}
 .tool-group:last-child{border-right:none}
@@ -98,9 +99,7 @@ input:focus{border-color:var(--accent)}
   background:var(--surface2);color:var(--text);padding:4px 8px;border-radius:6px;
   font-size:11px;white-space:nowrap;pointer-events:none;z-index:999;border:1px solid var(--border);
 }
-.separator{width:1px;height:24px;background:var(--border);margin:0 4px}
 
-/* Range input */
 input[type=range]{
   -webkit-appearance:none;height:4px;background:var(--border);border-radius:2px;
   outline:none;cursor:pointer;width:80px;
@@ -110,27 +109,23 @@ input[type=range]::-webkit-slider-thumb{
   border-radius:50%;cursor:pointer;
 }
 
-/* Color palette */
 .color-swatch{
   width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;
   transition:.15s;flex-shrink:0;
 }
 .color-swatch.active,.color-swatch:hover{border-color:var(--text);transform:scale(1.15)}
-.color-picker-wrap{position:relative}
 #custom-color{
   width:22px;height:22px;padding:0;border:none;border-radius:50%;cursor:pointer;
-  background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red);
   overflow:hidden;
 }
 
-/* Users panel */
 #users-panel{
   display:flex;align-items:center;gap:6px;margin-left:auto;
 }
 .user-avatar{
   width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;
   font-size:11px;font-weight:600;color:#fff;border:2px solid var(--bg);margin-left:-6px;
-  cursor:default;position:relative;
+  cursor:default;
 }
 .user-avatar:first-child{margin-left:0}
 #room-info{
@@ -140,7 +135,6 @@ input[type=range]::-webkit-slider-thumb{
 }
 #room-info:hover{color:var(--accent)}
 
-/* ── Canvas area ── */
 #canvas-wrap{
   flex:1;position:relative;overflow:hidden;background:#1a1a24;
   background-image:radial-gradient(circle,rgba(255,255,255,.04) 1px,transparent 1px);
@@ -151,18 +145,15 @@ input[type=range]::-webkit-slider-thumb{
 }
 #overlay-canvas{pointer-events:none}
 
-/* ── Cursors ── */
 .remote-cursor{
   position:absolute;pointer-events:none;z-index:500;
   transform:translate(-2px,-2px);transition:top .05s,left .05s;
 }
-.remote-cursor svg{filter:drop-shadow(1px 2px 3px rgba(0,0,0,.4))}
 .cursor-label{
   position:absolute;top:20px;left:8px;padding:2px 7px;border-radius:20px;
   font-size:11px;font-weight:600;color:#fff;white-space:nowrap;
 }
 
-/* ── Sticky notes ── */
 .sticky-note{
   position:absolute;min-width:180px;min-height:120px;border-radius:12px;
   padding:10px;font-size:13px;line-height:1.5;cursor:move;user-select:none;
@@ -173,9 +164,7 @@ input[type=range]::-webkit-slider-thumb{
   outline:none;font-family:'DM Sans',sans-serif;font-size:13px;
   color:#1a1a1a;resize:none;cursor:text;
 }
-.note-header{
-  display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;
-}
+.note-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
 .note-color-btns{display:flex;gap:4px}
 .note-color-btn{width:14px;height:14px;border-radius:50%;cursor:pointer;border:1px solid rgba(0,0,0,.15)}
 .note-delete-btn{
@@ -185,20 +174,15 @@ input[type=range]::-webkit-slider-thumb{
 }
 .note-delete-btn:hover{opacity:1;background:rgba(255,0,0,.2)}
 
-/* ── Context menu ── */
 #ctx-menu{
   position:fixed;background:var(--surface);border:1px solid var(--border);
   border-radius:10px;padding:6px;min-width:140px;box-shadow:var(--shadow);
   z-index:1000;display:none;
 }
-.ctx-item{
-  padding:8px 12px;border-radius:7px;cursor:pointer;font-size:13px;
-  display:flex;align-items:center;gap:8px;
-}
+.ctx-item{padding:8px 12px;border-radius:7px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px;}
 .ctx-item:hover{background:var(--surface2)}
 .ctx-item.danger{color:var(--accent2)}
 
-/* ── Toast ── */
 #toast{
   position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
   background:var(--surface);border:1px solid var(--border);color:var(--text);
@@ -207,7 +191,6 @@ input[type=range]::-webkit-slider-thumb{
 }
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
-/* ── Scrollbar ── */
 ::-webkit-scrollbar{width:6px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
@@ -215,20 +198,16 @@ input[type=range]::-webkit-slider-thumb{
 </head>
 <body>
 
-<!-- ════ LOBBY ════ -->
+<!-- LOBBY -->
 <div id="lobby">
   <div class="lobby-card">
     <div class="lobby-logo">✦ Whiteboard</div>
     <div class="lobby-sub">Real-time collaborative canvas</div>
-
     <div class="tabs">
       <button class="tab active" onclick="switchTab('create')">Yangi xona</button>
       <button class="tab" onclick="switchTab('join')">Kirish</button>
     </div>
-
     <div id="error-msg" class="error-msg"></div>
-
-    <!-- Create tab -->
     <div id="tab-create" class="tab-panel active">
       <div class="form-group">
         <label>Xona nomi (ixtiyoriy)</label>
@@ -240,12 +219,10 @@ input[type=range]::-webkit-slider-thumb{
       </div>
       <button class="btn btn-primary" onclick="createRoom()">Xona yaratish →</button>
     </div>
-
-    <!-- Join tab -->
     <div id="tab-join" class="tab-panel">
       <div class="form-group">
         <label>Xona ID</label>
-        <input type="text" id="join-room-id" placeholder="8 belgili ID kiriting" maxlength="8" style="font-family:'DM Mono',monospace;letter-spacing:2px"/>
+        <input type="text" id="join-room-id" placeholder="8 belgili ID" maxlength="8" style="font-family:'DM Mono',monospace;letter-spacing:2px"/>
       </div>
       <div class="form-group" id="password-field" style="display:none">
         <label>Parol</label>
@@ -257,12 +234,9 @@ input[type=range]::-webkit-slider-thumb{
   </div>
 </div>
 
-<!-- ════ APP ════ -->
+<!-- APP -->
 <div id="app">
-
-  <!-- Toolbar -->
   <div id="toolbar">
-    <!-- Drawing tools -->
     <div class="tool-group">
       <button class="tool-btn active" id="tool-pen" title="Qalam (P)" onclick="setTool('pen')">✏️</button>
       <button class="tool-btn" id="tool-eraser" title="O'chirg'ich (E)" onclick="setTool('eraser')">🧹</button>
@@ -274,8 +248,6 @@ input[type=range]::-webkit-slider-thumb{
       <button class="tool-btn" id="tool-text" title="Matn (T)" onclick="setTool('text')">T</button>
       <button class="tool-btn" id="tool-select" title="Tanlash (S)" onclick="setTool('select')">↖</button>
     </div>
-
-    <!-- Colors -->
     <div class="tool-group" style="gap:5px">
       <div class="color-swatch active" style="background:#e8e8f0" onclick="setColor('#e8e8f0')"></div>
       <div class="color-swatch" style="background:#6c63ff" onclick="setColor('#6c63ff')"></div>
@@ -285,65 +257,49 @@ input[type=range]::-webkit-slider-thumb{
       <div class="color-swatch" style="background:#48cae4" onclick="setColor('#48cae4')"></div>
       <div class="color-swatch" style="background:#ff9f1c" onclick="setColor('#ff9f1c')"></div>
       <div class="color-swatch" style="background:#ef233c" onclick="setColor('#ef233c')"></div>
-      <div class="color-picker-wrap">
-        <input type="color" id="custom-color" value="#ffffff" onchange="setColor(this.value)" title="Maxsus rang"/>
-      </div>
+      <input type="color" id="custom-color" value="#ffffff" onchange="setColor(this.value)" title="Maxsus rang"/>
     </div>
-
-    <!-- Fill toggle & width -->
     <div class="tool-group" style="gap:8px">
       <button class="tool-btn" id="fill-toggle" title="To'ldirish" onclick="toggleFill()">◈</button>
-      <input type="range" id="stroke-width" min="1" max="40" value="3" oninput="updateWidth(this.value)" title="Qalinlik"/>
+      <input type="range" id="stroke-width" min="1" max="40" value="3" oninput="updateWidth(this.value)"/>
       <span id="width-display" style="font-size:12px;color:var(--text2);min-width:20px;text-align:center">3</span>
-      <input type="range" id="opacity-range" min="10" max="100" value="100" oninput="updateOpacity(this.value)" title="Shaffoflik"/>
+      <input type="range" id="opacity-range" min="10" max="100" value="100" oninput="updateOpacity(this.value)"/>
       <span id="opacity-display" style="font-size:12px;color:var(--text2);min-width:30px">100%</span>
     </div>
-
-    <!-- Actions -->
     <div class="tool-group">
       <button class="tool-btn" title="Orqaga (Ctrl+Z)" onclick="undo()">↩</button>
       <button class="tool-btn" title="Sticky note" onclick="addStickyNote()">📌</button>
       <button class="tool-btn" title="Rasm yuklash" onclick="document.getElementById('img-upload').click()">🖼</button>
       <input type="file" id="img-upload" accept="image/*" style="display:none" onchange="handleImageUpload(event)"/>
       <button class="tool-btn" title="Yuklab olish" onclick="downloadCanvas()">💾</button>
-      <button class="tool-btn danger" title="Tozalash" onclick="clearBoard()" style="color:var(--accent2)">🗑</button>
+      <button class="tool-btn" title="Tozalash" onclick="clearBoard()" style="color:var(--accent2)">🗑</button>
     </div>
-
-    <!-- Users -->
     <div id="users-panel">
       <div id="avatar-list" style="display:flex;align-items:center"></div>
-      <div id="room-info" onclick="copyRoomLink()" title="Linkni nusxalash">📋 —</div>
+      <div id="room-info" onclick="copyRoomLink()">📋 —</div>
     </div>
   </div>
-
-  <!-- Canvas -->
   <div id="canvas-wrap">
     <canvas id="main-canvas"></canvas>
     <canvas id="overlay-canvas"></canvas>
-    <div id="cursors-layer"></div>
-    <div id="notes-layer"></div>
+    <div id="cursors-layer" style="position:absolute;inset:0;pointer-events:none;z-index:400"></div>
+    <div id="notes-layer" style="position:absolute;inset:0;pointer-events:none;z-index:200"></div>
   </div>
 </div>
 
-<!-- Context menu -->
 <div id="ctx-menu">
   <div class="ctx-item" onclick="undo()">↩ Orqaga</div>
   <div class="ctx-item" onclick="addStickyNote()">📌 Sticky note</div>
   <div class="ctx-item" onclick="downloadCanvas()">💾 Yuklab olish</div>
   <div class="ctx-item danger" onclick="clearBoard()">🗑 Hammasini tozalash</div>
 </div>
-
 <div id="toast"></div>
 
 <script>
-// ════════════════════════════════════════════════════════
-// CONFIG — faqat bu qatorni o'zgartiring!
-// ════════════════════════════════════════════════════════
-const SERVER_URL = 'https://whiteboard-backend-jeh6.onrender.com'; // → Render URL ga o'zgartiring
+// ════ CONFIG ════
+const SERVER_URL = 'https://whiteboard-backend-jeh6.onrender.com';
 
-// ════════════════════════════════════════════════════════
-// STATE
-// ════════════════════════════════════════════════════════
+// ════ STATE ════
 let socket = null;
 let currentRoomId = null;
 let currentUser = null;
@@ -356,35 +312,36 @@ let isDrawing = false;
 let currentStrokeId = null;
 let currentPoints = [];
 let startX = 0, startY = 0;
-let strokes = []; // { id, tool, points, shapeData, color, width, opacity, fillColor, userId }
-let stickyNotes = {}; // noteId -> el
-let remoteStrokes = {}; // userId -> current drawing points
+let strokes = [];
+let stickyNotes = {};
+let remoteStrokes = {};
 let onlineUsers = {};
 let textInput = null;
 const cursors = {};
 
-// Canvas setup
+// Canvas
 const mainCanvas = document.getElementById('main-canvas');
 const overlayCanvas = document.getElementById('overlay-canvas');
 const ctx = mainCanvas.getContext('2d');
 const octx = overlayCanvas.getContext('2d');
 
-// ════════════════════════════════════════════════════════
-// CANVAS RESIZE
-// ════════════════════════════════════════════════════════
+// ════ CANVAS RESIZE ════
 function resizeCanvas() {
   const wrap = document.getElementById('canvas-wrap');
-  const w = wrap.clientWidth, h = wrap.clientHeight;
-  mainCanvas.width = w; mainCanvas.height = h;
-  overlayCanvas.width = w; overlayCanvas.height = h;
+  if (!wrap) return;
+  const w = wrap.clientWidth;
+  const h = wrap.clientHeight;
+  if (w === 0 || h === 0) return;
+  mainCanvas.width = w;
+  mainCanvas.height = h;
+  overlayCanvas.width = w;
+  overlayCanvas.height = h;
   redrawAll();
 }
 
 window.addEventListener('resize', resizeCanvas);
 
-// ════════════════════════════════════════════════════════
-// LOBBY
-// ════════════════════════════════════════════════════════
+// ════ LOBBY ════
 function switchTab(tab) {
   document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='create')||(i===1&&tab==='join')));
   document.getElementById('tab-create').classList.toggle('active', tab==='create');
@@ -452,22 +409,34 @@ async function joinRoom() {
 
 function enterRoom(roomId) {
   currentRoomId = roomId;
-  document.getElementById('lobby').style.display = 'none';
-  document.getElementById('app').classList.add('visible');
-  document.getElementById('room-info').textContent = `📋 ${roomId}`;
-  setTimeout(() => {
-    resizeCanvas();
-    connectSocket(roomId);
-    loadRoomData(roomId);
-  }, 100);
 
-  // URL ni yangilash
+  // Lobby ni yashirish
+  const lobby = document.getElementById('lobby');
+  lobby.classList.add('hidden');
+
+  // App ni ko'rsatish — visibility ishlatamiz, display emas
+  const app = document.getElementById('app');
+  app.classList.add('visible');
+
+  document.getElementById('room-info').textContent = `📋 ${roomId}`;
+
+  // Canvas wrap ko'ringandan keyin resize
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      resizeCanvas();
+      connectSocket(roomId);
+      loadRoomData(roomId);
+
+      // Overlay canvas ga pointer events qaytarish
+      overlayCanvas.style.pointerEvents = 'auto';
+    });
+  });
+
   const url = new URL(window.location.href);
   url.searchParams.set('room', roomId);
   window.history.pushState({}, '', url);
 }
 
-// Sahifa yuklanganda URL dan room id olish
 window.addEventListener('load', () => {
   const params = new URLSearchParams(window.location.search);
   const roomId = params.get('room');
@@ -478,9 +447,7 @@ window.addEventListener('load', () => {
   }
 });
 
-// ════════════════════════════════════════════════════════
-// SOCKET
-// ════════════════════════════════════════════════════════
+// ════ SOCKET ════
 function connectSocket(roomId) {
   socket = io(SERVER_URL);
   const userId = localStorage.getItem('wb-user-id') || crypto.randomUUID();
@@ -495,18 +462,9 @@ function connectSocket(roomId) {
     users.forEach(u => addUserAvatar(u));
   });
 
-  socket.on('user-joined', (u) => {
-    addUserAvatar(u);
-    showToast(`${u.name} qo'shildi`);
-  });
+  socket.on('user-joined', (u) => { addUserAvatar(u); showToast(`${u.name} qo'shildi`); });
+  socket.on('user-left', (u) => { removeUserAvatar(u.userId); removeCursor(u.userId); showToast(`${u.name} chiqdi`); });
 
-  socket.on('user-left', (u) => {
-    removeUserAvatar(u.userId);
-    removeCursor(u.userId);
-    showToast(`${u.name} chiqdi`);
-  });
-
-  // Remote drawing
   socket.on('stroke-start', ({ userId, tool, color, width, opacity, fillColor }) => {
     remoteStrokes[userId] = { tool, color, width, opacity, fillColor, points: [] };
   });
@@ -524,78 +482,45 @@ function connectSocket(roomId) {
     redrawAll();
   });
 
-  socket.on('stroke-removed', ({ strokeId }) => {
-    strokes = strokes.filter(s => s.id !== strokeId);
-    redrawAll();
-  });
-
-  socket.on('board-cleared', () => {
-    strokes = [];
-    redrawAll();
-  });
+  socket.on('stroke-removed', ({ strokeId }) => { strokes = strokes.filter(s => s.id !== strokeId); redrawAll(); });
+  socket.on('board-cleared', () => { strokes = []; redrawAll(); });
 
   socket.on('image-add', (data) => {
     strokes.push({ id: data.strokeId, tool: 'image', shapeData: { x: data.x, y: data.y, width: data.width, height: data.height }, imageData: data.imageData });
     redrawAll();
   });
 
-  socket.on('note-add', (data) => {
-    createNoteEl(data.noteId, data.x, data.y, data.content, data.bgColor, false);
-  });
-
+  socket.on('note-add', (data) => { createNoteEl(data.noteId, data.x, data.y, data.content, data.bgColor, false); });
   socket.on('note-update', (data) => {
     const el = document.querySelector(`[data-note-id="${data.noteId}"] textarea`);
     if (el) el.value = data.content;
   });
-
   socket.on('note-delete', ({ noteId }) => {
     const el = document.querySelector(`[data-note-id="${noteId}"]`);
     if (el) el.remove();
     delete stickyNotes[noteId];
   });
 
-  socket.on('cursor-move', (data) => {
-    updateRemoteCursor(data);
-  });
-
-  socket.on('error', ({ message }) => {
-    showToast('⚠️ ' + message);
-  });
+  socket.on('cursor-move', (data) => { updateRemoteCursor(data); });
+  socket.on('error', ({ message }) => { showToast('⚠️ ' + message); });
 }
 
 async function loadRoomData(roomId) {
   try {
     const res = await fetch(`${SERVER_URL}/api/rooms/${roomId}/data`);
     const data = await res.json();
-
     strokes = data.strokes.map(s => ({
-      id: s.id,
-      tool: s.tool,
-      points: s.points || [],
-      shapeData: s.shape_data,
-      color: s.color,
-      width: s.width,
-      opacity: s.opacity,
-      fillColor: s.fill_color,
-      fontSize: s.font_size,
-      textContent: s.text_content,
-      imageData: s.image_data,
-      userId: s.user_id,
+      id: s.id, tool: s.tool, points: s.points || [],
+      shapeData: s.shape_data, color: s.color, width: s.width,
+      opacity: s.opacity, fillColor: s.fill_color, fontSize: s.font_size,
+      textContent: s.text_content, imageData: s.image_data, userId: s.user_id,
     }));
-
-    data.notes.forEach(n => {
-      createNoteEl(n.id, n.x, n.y, n.content, n.bg_color, false);
-    });
-
+    data.notes.forEach(n => createNoteEl(n.id, n.x, n.y, n.content, n.bg_color, false));
     redrawAll();
-  } catch(e) {
-    console.error('Load data error:', e);
-  }
+  } catch(e) { console.error('Load data error:', e); }
 }
 
-// ════════════════════════════════════════════════════════
-// TOOLS
-// ════════════════════════════════════════════════════════
+// ════ TOOLS ════
 function setTool(tool) {
   currentTool = tool;
   document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
@@ -608,36 +533,27 @@ function setTool(tool) {
 function setColor(c) {
   currentColor = c;
   document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
-  const swatches = document.querySelectorAll('.color-swatch');
-  swatches.forEach(s => { if (s.style.background === c) s.classList.add('active'); });
+  document.querySelectorAll('.color-swatch').forEach(s => { if (s.style.background === c) s.classList.add('active'); });
 }
 
-function updateWidth(v) {
-  currentWidth = parseInt(v);
-  document.getElementById('width-display').textContent = v;
-}
+function updateWidth(v) { currentWidth = parseInt(v); document.getElementById('width-display').textContent = v; }
+function updateOpacity(v) { currentOpacity = parseInt(v) / 100; document.getElementById('opacity-display').textContent = v + '%'; }
+function toggleFill() { fillEnabled = !fillEnabled; document.getElementById('fill-toggle').classList.toggle('active', fillEnabled); }
 
-function updateOpacity(v) {
-  currentOpacity = parseInt(v) / 100;
-  document.getElementById('opacity-display').textContent = v + '%';
-}
-
-function toggleFill() {
-  fillEnabled = !fillEnabled;
-  document.getElementById('fill-toggle').classList.toggle('active', fillEnabled);
-}
-
-// ════════════════════════════════════════════════════════
-// DRAWING — CANVAS EVENTS
-// ════════════════════════════════════════════════════════
+// ════ CANVAS EVENTS ════
 overlayCanvas.addEventListener('mousedown', onPointerDown);
 overlayCanvas.addEventListener('mousemove', onPointerMove);
 overlayCanvas.addEventListener('mouseup', onPointerUp);
 overlayCanvas.addEventListener('mouseleave', onPointerUp);
-overlayCanvas.addEventListener('touchstart', e => { e.preventDefault(); onPointerDown(e.touches[0]); }, {passive:false});
-overlayCanvas.addEventListener('touchmove', e => { e.preventDefault(); onPointerMove(e.touches[0]); }, {passive:false});
-overlayCanvas.addEventListener('touchend', e => { e.preventDefault(); onPointerUp(e.changedTouches[0]); }, {passive:false});
+overlayCanvas.addEventListener('touchstart', e => { e.preventDefault(); onPointerDown(getTouchEvent(e)); }, {passive:false});
+overlayCanvas.addEventListener('touchmove', e => { e.preventDefault(); onPointerMove(getTouchEvent(e)); }, {passive:false});
+overlayCanvas.addEventListener('touchend', e => { e.preventDefault(); onPointerUp(getTouchEvent(e)); }, {passive:false});
 overlayCanvas.addEventListener('contextmenu', onContextMenu);
+
+function getTouchEvent(e) {
+  const t = e.touches[0] || e.changedTouches[0];
+  return { clientX: t.clientX, clientY: t.clientY };
+}
 
 function getPos(e) {
   const rect = overlayCanvas.getBoundingClientRect();
@@ -645,20 +561,18 @@ function getPos(e) {
   const scaleY = overlayCanvas.height / rect.height;
   return {
     x: (e.clientX - rect.left) * scaleX,
-    y: (e.clientY - rect.top) * scaleY
+    y: (e.clientY - rect.top) * scaleY,
   };
 }
 
 function onPointerDown(e) {
   if (currentTool === 'text') { placeTextInput(e); return; }
   hideContextMenu();
-
   const pos = getPos(e);
   isDrawing = true;
   startX = pos.x; startY = pos.y;
   currentPoints = [pos];
   currentStrokeId = crypto.randomUUID();
-
   socket?.emit('stroke-start', {
     tool: currentTool, color: currentColor, width: currentWidth,
     opacity: currentOpacity, fillColor: fillEnabled ? currentColor : null,
@@ -668,56 +582,38 @@ function onPointerDown(e) {
 
 function onPointerMove(e) {
   const pos = getPos(e);
-
-  // Cursor broadcast
   socket?.emit('cursor-move', { x: pos.x, y: pos.y });
-
   if (!isDrawing) return;
-
   if (currentTool === 'pen' || currentTool === 'eraser') {
     currentPoints.push(pos);
     socket?.emit('stroke-point', { x: pos.x, y: pos.y });
   }
-
   drawOverlay(pos);
 }
 
 function onPointerUp(e) {
   if (!isDrawing) return;
   isDrawing = false;
-
   const pos = getPos(e);
   const shapeData = getShapeData(pos);
-
   const strokeData = {
-    strokeId: currentStrokeId,
-    tool: currentTool,
-    points: currentPoints,
-    shapeData,
-    color: currentColor,
-    width: currentWidth,
-    opacity: currentOpacity,
-    fillColor: fillEnabled ? currentColor : null,
+    strokeId: currentStrokeId, tool: currentTool, points: currentPoints,
+    shapeData, color: currentColor, width: currentWidth,
+    opacity: currentOpacity, fillColor: fillEnabled ? currentColor : null,
   };
-
-  // Locally add
   strokes.push({ ...strokeData, id: currentStrokeId, userId: currentUser?.userId });
   socket?.emit('stroke-end', strokeData);
-
   currentPoints = [];
   octx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
   redrawAll();
 }
 
 function getShapeData(pos) {
-  const tools = ['line','rect','circle','triangle','arrow'];
-  if (!tools.includes(currentTool)) return null;
+  if (!['line','rect','circle','triangle','arrow'].includes(currentTool)) return null;
   return { x1: startX, y1: startY, x2: pos.x, y2: pos.y };
 }
 
-// ════════════════════════════════════════════════════════
-// DRAWING FUNCTIONS
-// ════════════════════════════════════════════════════════
+// ════ DRAW ════
 function applyStyle(context, stroke) {
   context.globalAlpha = stroke.opacity || 1;
   context.strokeStyle = stroke.color || '#fff';
@@ -731,11 +627,8 @@ function drawStroke(context, stroke) {
   if (!stroke) return;
   context.save();
   applyStyle(context, stroke);
-
   switch(stroke.tool) {
-    case 'pen':
-      drawFreePen(context, stroke.points);
-      break;
+    case 'pen': drawFreePen(context, stroke.points); break;
     case 'eraser':
       context.globalCompositeOperation = 'destination-out';
       context.globalAlpha = 1;
@@ -743,21 +636,11 @@ function drawStroke(context, stroke) {
       drawFreePen(context, stroke.points);
       context.globalCompositeOperation = 'source-over';
       break;
-    case 'line':
-      if (stroke.shapeData) drawLine(context, stroke.shapeData, stroke.fillColor);
-      break;
-    case 'rect':
-      if (stroke.shapeData) drawRect(context, stroke.shapeData, stroke.fillColor);
-      break;
-    case 'circle':
-      if (stroke.shapeData) drawCircle(context, stroke.shapeData, stroke.fillColor);
-      break;
-    case 'triangle':
-      if (stroke.shapeData) drawTriangle(context, stroke.shapeData, stroke.fillColor);
-      break;
-    case 'arrow':
-      if (stroke.shapeData) drawArrow(context, stroke.shapeData);
-      break;
+    case 'line': if (stroke.shapeData) drawLine(context, stroke.shapeData); break;
+    case 'rect': if (stroke.shapeData) drawRect(context, stroke.shapeData, stroke.fillColor); break;
+    case 'circle': if (stroke.shapeData) drawCircle(context, stroke.shapeData, stroke.fillColor); break;
+    case 'triangle': if (stroke.shapeData) drawTriangle(context, stroke.shapeData, stroke.fillColor); break;
+    case 'arrow': if (stroke.shapeData) drawArrow(context, stroke.shapeData); break;
     case 'text':
       if (stroke.shapeData && stroke.textContent) {
         context.font = `${stroke.fontSize || 18}px 'DM Sans', sans-serif`;
@@ -769,13 +652,9 @@ function drawStroke(context, stroke) {
     case 'image':
       if (stroke.imageData && stroke.shapeData) {
         const img = new Image();
+        img.onload = () => context.drawImage(img, stroke.shapeData.x, stroke.shapeData.y, stroke.shapeData.width, stroke.shapeData.height);
         img.src = stroke.imageData;
-        img.onload = () => {
-          context.drawImage(img, stroke.shapeData.x, stroke.shapeData.y, stroke.shapeData.width, stroke.shapeData.height);
-        };
-        if (img.complete) {
-          context.drawImage(img, stroke.shapeData.x, stroke.shapeData.y, stroke.shapeData.width, stroke.shapeData.height);
-        }
+        if (img.complete) context.drawImage(img, stroke.shapeData.x, stroke.shapeData.y, stroke.shapeData.width, stroke.shapeData.height);
       }
       break;
   }
@@ -795,39 +674,29 @@ function drawFreePen(context, points) {
   context.stroke();
 }
 
-function drawLine(context, d, fill) {
-  context.beginPath();
-  context.moveTo(d.x1, d.y1);
-  context.lineTo(d.x2, d.y2);
-  context.stroke();
+function drawLine(context, d) {
+  context.beginPath(); context.moveTo(d.x1, d.y1); context.lineTo(d.x2, d.y2); context.stroke();
 }
 
 function drawRect(context, d, fill) {
   const x = Math.min(d.x1,d.x2), y = Math.min(d.y1,d.y2);
   const w = Math.abs(d.x2-d.x1), h = Math.abs(d.y2-d.y1);
-  context.beginPath();
-  context.rect(x, y, w, h);
-  if (fill) context.fill();
-  context.stroke();
+  context.beginPath(); context.rect(x, y, w, h);
+  if (fill) context.fill(); context.stroke();
 }
 
 function drawCircle(context, d, fill) {
   const cx = (d.x1+d.x2)/2, cy = (d.y1+d.y2)/2;
   const rx = Math.abs(d.x2-d.x1)/2, ry = Math.abs(d.y2-d.y1)/2;
-  context.beginPath();
-  context.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2);
-  if (fill) context.fill();
-  context.stroke();
+  context.beginPath(); context.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2);
+  if (fill) context.fill(); context.stroke();
 }
 
 function drawTriangle(context, d, fill) {
   context.beginPath();
   context.moveTo((d.x1+d.x2)/2, d.y1);
-  context.lineTo(d.x2, d.y2);
-  context.lineTo(d.x1, d.y2);
-  context.closePath();
-  if (fill) context.fill();
-  context.stroke();
+  context.lineTo(d.x2, d.y2); context.lineTo(d.x1, d.y2); context.closePath();
+  if (fill) context.fill(); context.stroke();
 }
 
 function drawArrow(context, d) {
@@ -835,10 +704,7 @@ function drawArrow(context, d) {
   const angle = Math.atan2(dy, dx);
   const len = Math.sqrt(dx*dx+dy*dy);
   const headLen = Math.min(20, len*0.3);
-  context.beginPath();
-  context.moveTo(d.x1, d.y1);
-  context.lineTo(d.x2, d.y2);
-  context.stroke();
+  context.beginPath(); context.moveTo(d.x1, d.y1); context.lineTo(d.x2, d.y2); context.stroke();
   context.beginPath();
   context.moveTo(d.x2, d.y2);
   context.lineTo(d.x2 - headLen*Math.cos(angle-Math.PI/6), d.y2 - headLen*Math.sin(angle-Math.PI/6));
@@ -854,11 +720,8 @@ function drawOverlay(pos) {
   octx.strokeStyle = currentColor;
   octx.fillStyle = currentColor;
   octx.lineWidth = currentWidth;
-  octx.lineCap = 'round';
-  octx.lineJoin = 'round';
-
+  octx.lineCap = 'round'; octx.lineJoin = 'round';
   const d = { x1: startX, y1: startY, x2: pos.x, y2: pos.y };
-
   switch(currentTool) {
     case 'pen': drawFreePen(octx, currentPoints); break;
     case 'eraser':
@@ -873,19 +736,15 @@ function drawOverlay(pos) {
     case 'triangle': drawTriangle(octx, d, fillEnabled ? currentColor : null); break;
     case 'arrow': drawArrow(octx, d); break;
   }
-
-  // Remote strokes on overlay
   Object.values(remoteStrokes).forEach(rs => {
     octx.save();
     octx.globalAlpha = rs.opacity || 1;
     octx.strokeStyle = rs.color;
     octx.lineWidth = rs.width;
-    octx.lineCap = 'round';
-    octx.lineJoin = 'round';
+    octx.lineCap = 'round'; octx.lineJoin = 'round';
     drawFreePen(octx, rs.points);
     octx.restore();
   });
-
   octx.restore();
 }
 
@@ -901,16 +760,13 @@ function redrawOverlay() {
     octx.globalAlpha = rs.opacity || 1;
     octx.strokeStyle = rs.color;
     octx.lineWidth = rs.width;
-    octx.lineCap = 'round';
-    octx.lineJoin = 'round';
+    octx.lineCap = 'round'; octx.lineJoin = 'round';
     drawFreePen(octx, rs.points);
     octx.restore();
   });
 }
 
-// ════════════════════════════════════════════════════════
-// TEXT TOOL
-// ════════════════════════════════════════════════════════
+// ════ TEXT ════
 function placeTextInput(e) {
   if (textInput) textInput.remove();
   const pos = getPos(e);
@@ -918,46 +774,33 @@ function placeTextInput(e) {
   textInput.style.cssText = `
     position:absolute;left:${pos.x}px;top:${pos.y}px;
     background:rgba(108,99,255,.15);border:1px dashed var(--accent);
-    color:${currentColor};font-size:${Math.max(currentWidth * 4, 16)}px;
+    color:${currentColor};font-size:${Math.max(currentWidth*4,16)}px;
     font-family:'DM Sans',sans-serif;outline:none;resize:both;
     min-width:120px;min-height:40px;padding:4px 8px;border-radius:6px;z-index:300;
   `;
   document.getElementById('canvas-wrap').appendChild(textInput);
   textInput.focus();
-
   textInput.addEventListener('blur', () => {
     const text = textInput.value.trim();
     if (text) {
       const strokeId = crypto.randomUUID();
-      const shapeData = { x: pos.x, y: pos.y + Math.max(currentWidth * 4, 16) };
-      const strokeData = {
-        strokeId, tool: 'text', points: [],
-        shapeData, color: currentColor, width: currentWidth,
-        opacity: currentOpacity, fillColor: null,
-        fontSize: Math.max(currentWidth * 4, 16), textContent: text,
-      };
+      const shapeData = { x: pos.x, y: pos.y + Math.max(currentWidth*4,16) };
+      const strokeData = { strokeId, tool: 'text', points: [], shapeData, color: currentColor, width: currentWidth, opacity: currentOpacity, fillColor: null, fontSize: Math.max(currentWidth*4,16), textContent: text };
       strokes.push({ ...strokeData, id: strokeId, userId: currentUser?.userId });
       socket?.emit('stroke-end', strokeData);
       redrawAll();
     }
-    textInput.remove();
-    textInput = null;
+    textInput.remove(); textInput = null;
   });
-
-  textInput.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { textInput.remove(); textInput = null; }
-  });
+  textInput.addEventListener('keydown', e => { if (e.key === 'Escape') { textInput.remove(); textInput = null; } });
 }
 
-// ════════════════════════════════════════════════════════
-// STICKY NOTES
-// ════════════════════════════════════════════════════════
+// ════ STICKY NOTES ════
 const NOTE_COLORS = ['#fef08a','#bbf7d0','#bfdbfe','#fecaca','#e9d5ff','#fed7aa'];
 
 function addStickyNote() {
   const noteId = crypto.randomUUID();
-  const x = 100 + Math.random() * 200;
-  const y = 100 + Math.random() * 200;
+  const x = 100 + Math.random() * 200, y = 100 + Math.random() * 200;
   const bgColor = NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)];
   createNoteEl(noteId, x, y, '', bgColor, true);
   socket?.emit('note-add', { noteId, x, y, content: '', bgColor, width: 200, height: 150 });
@@ -967,11 +810,9 @@ function createNoteEl(noteId, x, y, content, bgColor, editable) {
   const el = document.createElement('div');
   el.className = 'sticky-note';
   el.dataset.noteId = noteId;
-  el.style.cssText = `left:${x}px;top:${y}px;background:${bgColor || '#fef08a'};width:200px;height:150px;`;
-
+  el.style.cssText = `left:${x}px;top:${y}px;background:${bgColor||'#fef08a'};width:200px;height:150px;pointer-events:all;`;
   const header = document.createElement('div');
   header.className = 'note-header';
-
   const colorBtns = document.createElement('div');
   colorBtns.className = 'note-color-btns';
   NOTE_COLORS.forEach(c => {
@@ -981,40 +822,25 @@ function createNoteEl(noteId, x, y, content, bgColor, editable) {
     btn.onclick = () => { el.style.background = c; };
     colorBtns.appendChild(btn);
   });
-
   const delBtn = document.createElement('button');
   delBtn.className = 'note-delete-btn';
   delBtn.textContent = '×';
-  delBtn.onclick = () => {
-    el.remove();
-    delete stickyNotes[noteId];
-    socket?.emit('note-delete', { noteId });
-  };
-
-  header.appendChild(colorBtns);
-  header.appendChild(delBtn);
-
+  delBtn.onclick = () => { el.remove(); delete stickyNotes[noteId]; socket?.emit('note-delete', { noteId }); };
+  header.appendChild(colorBtns); header.appendChild(delBtn);
   const ta = document.createElement('textarea');
   ta.value = content || '';
   ta.placeholder = 'Yozing...';
-
   let saveTimeout;
   ta.addEventListener('input', () => {
     clearTimeout(saveTimeout);
     saveTimeout = setTimeout(() => {
       const rect = el.getBoundingClientRect();
       const wrap = document.getElementById('canvas-wrap').getBoundingClientRect();
-      socket?.emit('note-update', {
-        noteId, content: ta.value,
-        x: rect.left - wrap.left, y: rect.top - wrap.top,
-      });
+      socket?.emit('note-update', { noteId, content: ta.value, x: rect.left - wrap.left, y: rect.top - wrap.top });
     }, 500);
   });
-
-  el.appendChild(header);
-  el.appendChild(ta);
+  el.appendChild(header); el.appendChild(ta);
   document.getElementById('notes-layer').appendChild(el);
-
   makeDraggable(el, noteId);
   stickyNotes[noteId] = el;
 }
@@ -1023,28 +849,15 @@ function makeDraggable(el, noteId) {
   let ox, oy, dragging = false;
   el.addEventListener('mousedown', e => {
     if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON' || e.target.className === 'note-color-btn') return;
-    dragging = true;
-    ox = e.clientX - el.offsetLeft;
-    oy = e.clientY - el.offsetTop;
-    el.style.zIndex = 300;
+    dragging = true; ox = e.clientX - el.offsetLeft; oy = e.clientY - el.offsetTop; el.style.zIndex = 300;
   });
-  document.addEventListener('mousemove', e => {
-    if (!dragging) return;
-    el.style.left = (e.clientX - ox) + 'px';
-    el.style.top = (e.clientY - oy) + 'px';
-  });
+  document.addEventListener('mousemove', e => { if (!dragging) return; el.style.left = (e.clientX - ox) + 'px'; el.style.top = (e.clientY - oy) + 'px'; });
   document.addEventListener('mouseup', () => {
-    if (dragging) {
-      dragging = false;
-      const ta = el.querySelector('textarea');
-      socket?.emit('note-update', { noteId, content: ta?.value || '', x: el.offsetLeft, y: el.offsetTop });
-    }
+    if (dragging) { dragging = false; const ta = el.querySelector('textarea'); socket?.emit('note-update', { noteId, content: ta?.value || '', x: el.offsetLeft, y: el.offsetTop }); }
   });
 }
 
-// ════════════════════════════════════════════════════════
-// UNDO, CLEAR, DOWNLOAD
-// ════════════════════════════════════════════════════════
+// ════ ACTIONS ════
 function undo() {
   if (!currentUser) return;
   const myStrokes = strokes.filter(s => s.userId === currentUser.userId);
@@ -1057,33 +870,23 @@ function undo() {
 
 function clearBoard() {
   if (!confirm('Barcha chizmalar o\'chiriladi. Davom etasizmi?')) return;
-  strokes = [];
-  redrawAll();
-  socket?.emit('clear-board');
+  strokes = []; redrawAll(); socket?.emit('clear-board');
 }
 
 function downloadCanvas() {
-  // Asosiy canvas + notes ni birlashtirish
   const tempCanvas = document.createElement('canvas');
-  tempCanvas.width = mainCanvas.width;
-  tempCanvas.height = mainCanvas.height;
+  tempCanvas.width = mainCanvas.width; tempCanvas.height = mainCanvas.height;
   const tCtx = tempCanvas.getContext('2d');
-  tCtx.fillStyle = '#1a1a24';
-  tCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+  tCtx.fillStyle = '#1a1a24'; tCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
   tCtx.drawImage(mainCanvas, 0, 0);
-
   const link = document.createElement('a');
   link.download = `whiteboard-${currentRoomId}-${Date.now()}.png`;
   link.href = tempCanvas.toDataURL('image/png');
   link.click();
 }
 
-// ════════════════════════════════════════════════════════
-// IMAGE UPLOAD
-// ════════════════════════════════════════════════════════
 function handleImageUpload(e) {
-  const file = e.target.files[0];
-  if (!file) return;
+  const file = e.target.files[0]; if (!file) return;
   const reader = new FileReader();
   reader.onload = (ev) => {
     const img = new Image();
@@ -1092,88 +895,53 @@ function handleImageUpload(e) {
       let w = img.width, h = img.height;
       if (w > maxW) { h = h * maxW / w; w = maxW; }
       if (h > maxH) { w = w * maxH / h; h = maxH; }
-      const x = (mainCanvas.width - w) / 2;
-      const y = (mainCanvas.height - h) / 2;
-
+      const x = (mainCanvas.width - w) / 2, y = (mainCanvas.height - h) / 2;
       const strokeId = crypto.randomUUID();
       const data = { strokeId, x, y, width: w, height: h, imageData: ev.target.result };
       strokes.push({ id: strokeId, tool: 'image', shapeData: { x, y, width: w, height: h }, imageData: ev.target.result });
-      socket?.emit('image-add', data);
-      redrawAll();
+      socket?.emit('image-add', data); redrawAll();
     };
     img.src = ev.target.result;
   };
-  reader.readAsDataURL(file);
-  e.target.value = '';
+  reader.readAsDataURL(file); e.target.value = '';
 }
 
-// ════════════════════════════════════════════════════════
-// CURSORS
-// ════════════════════════════════════════════════════════
+// ════ CURSORS ════
 function updateRemoteCursor({ userId, name, color, x, y }) {
   let el = cursors[userId];
   if (!el) {
     el = document.createElement('div');
     el.className = 'remote-cursor';
-    el.innerHTML = `
-      <svg width="20" height="24" viewBox="0 0 20 24">
-        <path d="M0 0L0 18L5 13L8 20L11 19L8 12L14 12Z" fill="${color}" stroke="rgba(0,0,0,.4)" stroke-width="1"/>
-      </svg>
-      <div class="cursor-label" style="background:${color}">${name}</div>
-    `;
+    el.innerHTML = `<svg width="20" height="24" viewBox="0 0 20 24"><path d="M0 0L0 18L5 13L8 20L11 19L8 12L14 12Z" fill="${color}" stroke="rgba(0,0,0,.4)" stroke-width="1"/></svg><div class="cursor-label" style="background:${color}">${name}</div>`;
     document.getElementById('cursors-layer').appendChild(el);
     cursors[userId] = el;
   }
-  el.style.left = x + 'px';
-  el.style.top = y + 'px';
+  el.style.left = x + 'px'; el.style.top = y + 'px';
 }
 
-function removeCursor(userId) {
-  if (cursors[userId]) { cursors[userId].remove(); delete cursors[userId]; }
-}
+function removeCursor(userId) { if (cursors[userId]) { cursors[userId].remove(); delete cursors[userId]; } }
 
-// ════════════════════════════════════════════════════════
-// USERS
-// ════════════════════════════════════════════════════════
 function addUserAvatar({ userId, name, color }) {
   onlineUsers[userId] = { name, color };
   const list = document.getElementById('avatar-list');
   if (document.querySelector(`[data-uid="${userId}"]`)) return;
   const el = document.createElement('div');
-  el.className = 'user-avatar';
-  el.dataset.uid = userId;
-  el.style.background = color;
-  el.textContent = name[0].toUpperCase();
-  el.title = name;
+  el.className = 'user-avatar'; el.dataset.uid = userId;
+  el.style.background = color; el.textContent = name[0].toUpperCase(); el.title = name;
   list.appendChild(el);
 }
 
-function removeUserAvatar(userId) {
-  const el = document.querySelector(`[data-uid="${userId}"]`);
-  if (el) el.remove();
-  delete onlineUsers[userId];
-}
+function removeUserAvatar(userId) { const el = document.querySelector(`[data-uid="${userId}"]`); if (el) el.remove(); delete onlineUsers[userId]; }
 
-// ════════════════════════════════════════════════════════
-// CONTEXT MENU
-// ════════════════════════════════════════════════════════
 function onContextMenu(e) {
   e.preventDefault();
   const menu = document.getElementById('ctx-menu');
-  menu.style.display = 'block';
-  menu.style.left = e.clientX + 'px';
-  menu.style.top = e.clientY + 'px';
+  menu.style.display = 'block'; menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px';
 }
 
-function hideContextMenu() {
-  document.getElementById('ctx-menu').style.display = 'none';
-}
-
+function hideContextMenu() { document.getElementById('ctx-menu').style.display = 'none'; }
 document.addEventListener('click', hideContextMenu);
 
-// ════════════════════════════════════════════════════════
-// UTILS
-// ════════════════════════════════════════════════════════
 function copyRoomLink() {
   const url = `${window.location.origin}${window.location.pathname}?room=${currentRoomId}`;
   navigator.clipboard.writeText(url).then(() => showToast('🔗 Link nusxalandi!'));
@@ -1181,12 +949,10 @@ function copyRoomLink() {
 
 function showToast(msg) {
   const toast = document.getElementById('toast');
-  toast.textContent = msg;
-  toast.classList.add('show');
+  toast.textContent = msg; toast.classList.add('show');
   setTimeout(() => toast.classList.remove('show'), 2500);
 }
 
-// Keyboard shortcuts
 document.addEventListener('keydown', e => {
   if (!currentRoomId) return;
   if (e.ctrlKey && e.key === 'z') { undo(); return; }
