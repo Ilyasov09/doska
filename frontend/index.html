@@ -455,9 +455,11 @@ function enterRoom(roomId) {
   document.getElementById('lobby').style.display = 'none';
   document.getElementById('app').classList.add('visible');
   document.getElementById('room-info').textContent = `📋 ${roomId}`;
-  resizeCanvas();
-  connectSocket(roomId);
-  loadRoomData(roomId);
+  setTimeout(() => {
+    resizeCanvas();
+    connectSocket(roomId);
+    loadRoomData(roomId);
+  }, 100);
 
   // URL ni yangilash
   const url = new URL(window.location.href);
