@@ -284,6 +284,24 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);tou
 #toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%) translateY(14px);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 16px;border-radius:9px;font-size:13px;z-index:9999;opacity:0;transition:.3s;pointer-events:none;white-space:nowrap;max-width:90vw;text-overflow:ellipsis;overflow:hidden}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
+/* ══ LOCK INDICATOR ══ */
+.stroke-locked-overlay{
+  position:absolute;pointer-events:none;border:2px dashed var(--accent2);
+  border-radius:4px;z-index:450;transition:all .1s;
+}
+.stroke-locked-label{
+  position:absolute;top:-20px;left:0;background:var(--accent2);color:#fff;
+  font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;white-space:nowrap;
+}
+.locked-pulse{animation:locked-pulse .8s ease-in-out infinite}
+@keyframes locked-pulse{0%,100%{border-color:var(--accent2)}50%{border-color:rgba(255,107,138,.3)}}
+
+/* ══ LOCK INDICATOR ══ */
+.lock-overlay{position:absolute;pointer-events:none;z-index:450;border-radius:4px}
+.lock-overlay-border{position:absolute;inset:0;border:2px dashed var(--accent2);border-radius:4px;animation:lpulse .9s ease-in-out infinite}
+.lock-overlay-label{position:absolute;top:-22px;left:0;background:var(--accent2);color:#fff;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;white-space:nowrap;pointer-events:none}
+@keyframes lpulse{0%,100%{opacity:1}50%{opacity:.4}}
+
 /* ══ CONTEXT MENU ══ */
 #ctx{position:fixed;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:5px;min-width:150px;box-shadow:var(--shadow);z-index:1000;display:none}
 .ci{padding:7px 11px;border-radius:6px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:7px;color:var(--text);transition:.1s}
@@ -666,6 +684,14 @@ let chatOpen=false,activityOpen=false,unreadCount=0;
 let textEl=null;
 let rulerOn=false;
 
+// Lock tizimi
+const strokeLocks = {}; // strokeId -> { userId, color, name }
+let myLock = null; // Men hozir lock qilgan strokeId
+
+// Lock tizimi
+const strokeLocks = {}; // strokeId -> { userId, color, name }
+let myLock = null; // Men hozir lock qilgan strokeId
+
 // Batch stroke buffer
 let batchBuffer=[];
 let batchTimer=null;
@@ -764,6 +790,9 @@ function enterRoom(id,preferredName){
 
 function leaveRoom(){
   if(!confirm('Xonani tark etasizmi?')) return;
+  // Barcha lock larni ozod qilish
+  if(myLock&&socket){socket.emit('stroke-unlock',{strokeId:myLock});myLock=null}
+  Object.keys(strokeLocks).forEach(k=>delete strokeLocks[k]);
   if(socket){socket.disconnect();socket=null}
   roomId=null;me=null;pages=[];
   document.getElementById('app').classList.remove('on');
@@ -797,7 +826,17 @@ function connectSocket(id,preferredName){
   const savedName=preferredName||localStorage.getItem('wb-name')||'';
 
   socket.on('connect',()=>socket.emit('join-room',{roomId:id,userId,preferredName:savedName}));
-  socket.on('joined',({user,onlineUsers:users})=>{me=user;if(user.name)localStorage.setItem('wb-name',user.name);users.forEach(addAvatar)});
+  socket.on('joined',({user,onlineUsers:users,activeLocks})=>{
+    me=user;
+    if(user.name)localStorage.setItem('wb-name',user.name);
+    users.forEach(addAvatar);
+    // Mavjud lock larni qabul qilish
+    if(activeLocks){
+      Object.entries(activeLocks).forEach(([sid,lock])=>{
+        strokeLocks[sid]=lock;
+      });
+    }
+  });
   socket.on('user-joined',u=>{addAvatar(u);toast(`${u.name} qo'shildi`)});
   socket.on('user-left',u=>{removeAvatar(u.userId);removeCursor(u.userId);toast(`${u.name} chiqdi`)});
   socket.on('user-renamed',({userId,name})=>{if(onlineUsers[userId])onlineUsers[userId].name=name;const el=document.querySelector(`[data-uid="${userId}"]`);if(el)el.title=name});
@@ -826,6 +865,50 @@ function connectSocket(id,preferredName){
   });
   socket.on('cursor-move',d=>updateCursor(d));
   socket.on('activity',d=>appendActivity(d));
+  socket.on('stroke-locked',({strokeId,userId,color,name})=>{strokeLocks[strokeId]={userId,color,name};renderLockOverlays()});
+  socket.on('stroke-unlocked',({strokeId,newPoints,newShapeData})=>{
+    delete strokeLocks[strokeId];
+    if(newPoints!==undefined||newShapeData!==undefined){
+      const s=curStrokes().find(s=>s.id===strokeId);
+      if(s){if(newPoints!==undefined)s.pts=newPoints;if(newShapeData!==undefined)s.shape=newShapeData;redraw();updateThumb(currentPageIdx)}
+    }
+    renderLockOverlays();
+  });
+  socket.on('strokes-unlocked',({strokeIds})=>{strokeIds.forEach(sid=>delete strokeLocks[sid]);renderLockOverlays()});
+  socket.on('stroke-lock-denied',({strokeId,lockedBy})=>{
+    const u=onlineUsers[lockedBy];toast('⛔ '+(u?.name||'Boshqa kishi')+' bu elementni ishlatmoqda');
+    selectedId=null;isDragging=false;resizing=null;redraw();
+  });
+
+  // ── Lock events ──────────────────────────────────────────────────────────
+  socket.on('stroke-locked',({strokeId,userId,color,name})=>{
+    strokeLocks[strokeId]={userId,color,name};
+    renderLockOverlays();
+  });
+  socket.on('stroke-unlocked',({strokeId,newPoints,newShapeData})=>{
+    delete strokeLocks[strokeId];
+    // Final pozitsiyani qabul qilish
+    if(newPoints!==undefined||newShapeData!==undefined){
+      const s=curStrokes().find(s=>s.id===strokeId);
+      if(s){
+        if(newPoints!==undefined) s.pts=newPoints;
+        if(newShapeData!==undefined) s.shape=newShapeData;
+        redraw();updateThumb(currentPageIdx);
+      }
+    }
+    renderLockOverlays();
+  });
+  socket.on('strokes-unlocked',({strokeIds})=>{
+    strokeIds.forEach(sid=>delete strokeLocks[sid]);
+    renderLockOverlays();
+  });
+  socket.on('stroke-lock-denied',({strokeId,lockedBy,lockedByColor})=>{
+    const u=onlineUsers[lockedBy];
+    toast(`⛔ ${u?.name||'Boshqa kishi'} bu elementni ishlatmoqda`);
+    // Harakatni bekor qilish
+    selectedId=null;isDragging=false;resizing=null;
+    redraw();
+  });
   socket.on('error',({message})=>toast('⚠️ '+message));
 }
 
@@ -1102,14 +1185,34 @@ function onDown(e){
       const s=curStrokes().find(s=>s.id===selectedId);
       if(s&&s.tool==='image'){
         const h=getResizeHandle(s,world.x,world.y);
-        if(h){resizing={strokeId:s.id,handle:h,startX:world.x,startY:world.y,origShape:{...s.shape}};overlayC.style.cursor=getResizeCursor(h);return}
+        if(h){
+          // Agar boshqa kishi lock qilgan bo'lsa
+          if(strokeLocks[s.id]&&strokeLocks[s.id].userId!==me?.userId){
+            toast('⛔ '+strokeLocks[s.id].name+' bu rasmni ishlatmoqda');return;
+          }
+          resizing={strokeId:s.id,handle:h,startX:world.x,startY:world.y,origShape:{...s.shape}};
+          myLock=s.id;
+          socket?.emit('stroke-lock',{strokeId:s.id});
+          overlayC.style.cursor=getResizeCursor(h);return;
+        }
       }
     }
     const hit=hitTest(world.x,world.y);
     if(hit){
-      const maxZ=Math.max(...curStrokes().map(s=>s.zIdx||0));
+      // Agar boshqa kishi lock qilgan bo'lsa — rad etish
+      if(strokeLocks[hit.id]&&strokeLocks[hit.id].userId!==me?.userId){
+        const locker=strokeLocks[hit.id];
+        toast('⛔ '+locker.name+' bu elementni ishlatmoqda');
+        selectedId=null;redraw();return;
+      }
+      const maxZ=Math.max(0,...curStrokes().map(s=>s.zIdx||0));
       if((hit.zIdx||0)<maxZ){hit.zIdx=maxZ+1;socket?.emit('stroke-zindex',{strokeId:hit.id,zIndex:hit.zIdx});curPage().strokes.sort((a,b)=>(a.zIdx||0)-(b.zIdx||0))}
-      selectedId=hit.id;isDragging=true;dragStart={x:world.x,y:world.y};dragOrigin=JSON.parse(JSON.stringify(hit));redraw();
+      selectedId=hit.id;isDragging=true;
+      dragStart={x:world.x,y:world.y};dragOrigin=JSON.parse(JSON.stringify(hit));
+      // Lock so'rash
+      myLock=hit.id;
+      socket?.emit('stroke-lock',{strokeId:hit.id});
+      redraw();
     }else{selectedId=null;redraw()}
     return;
   }
@@ -1142,7 +1245,7 @@ function onMove(e){
       if(h.includes('n')){y=o.y+dy;height=Math.max(20,o.height-dy)}
       s.shape={x,y,width,height};
       // Real-time broadcast
-      if(!resizing._last||Date.now()-resizing._last>16){
+      if(myLock===resizing.strokeId&&(!resizing._last||Date.now()-resizing._last>16)){
         socket?.emit('image-resize',{strokeId:resizing.strokeId,x,y,width,height});
         resizing._last=Date.now();
       }
@@ -1158,7 +1261,7 @@ function onMove(e){
       if(o.pts?.length) s.pts=o.pts.map(p=>({x:p.x+dx,y:p.y+dy}));
       if(o.shape) s.shape={...o.shape,x1:(o.shape.x1||0)+dx,y1:(o.shape.y1||0)+dy,x2:(o.shape.x2||0)+dx,y2:(o.shape.y2||0)+dy,x:(o.shape.x||0)+dx,y:(o.shape.y||0)+dy};
       // Real-time broadcast (throttled)
-      if(!isDragging._last||Date.now()-isDragging._last>16){
+      if(myLock===selectedId&&(!isDragging._last||Date.now()-isDragging._last>16)){
         socket?.emit('stroke-move',{strokeId:selectedId,newPoints:s.pts,newShapeData:s.shape});
         isDragging._last=Date.now();
       }
@@ -1188,13 +1291,21 @@ function onUp(e){
   if(isPanning){isPanning=false;panStart=null;return}
   if(resizing){
     const s=curStrokes().find(s=>s.id===resizing.strokeId);
-    if(s?.shape) socket?.emit('image-resize',{strokeId:resizing.strokeId,x:s.shape.x,y:s.shape.y,width:s.shape.width,height:s.shape.height});
+    if(s?.shape){
+      // Unlock + final o'lcham
+      socket?.emit('stroke-unlock',{strokeId:resizing.strokeId,newShapeData:s.shape});
+      if(myLock===resizing.strokeId) myLock=null;
+    }
     resizing=null;updateThumb(currentPageIdx);return;
   }
   if(isDragging&&selectedId){
     isDragging=false;
     const s=curStrokes().find(s=>s.id===selectedId);
-    if(s) socket?.emit('stroke-move',{strokeId:selectedId,newPoints:s.pts,newShapeData:s.shape});
+    // Unlock + final pozitsiya
+    if(s){
+      socket?.emit('stroke-unlock',{strokeId:selectedId,newPoints:s.pts,newShapeData:s.shape});
+    }
+    if(myLock===selectedId) myLock=null;
     dragOrigin=null;redraw();updateThumb(currentPageIdx);return;
   }
   if(!drawing) return;
@@ -1353,6 +1464,7 @@ function redraw(){
     ctx.strokeStyle=isLight?'rgba(0,0,0,.08)':'rgba(255,255,255,.06)';ctx.lineWidth=1/scale;ctx.strokeRect(0,0,pd.w,pd.h);
   }
   ctx.restore();drawOverlay();
+  renderLockOverlays();
 }
 
 // ════ TEXT ════
@@ -1642,6 +1754,47 @@ function onCtx(e){
 function hideCtx(){document.getElementById('ctx').style.display='none'}
 function ctxUndo(){undo();hideCtx()}function ctxRedo(){redo();hideCtx()}
 document.addEventListener('click',e=>{if(!e.target.closest('#ctx')) hideCtx()});
+
+// ════ LOCK OVERLAYS ════
+function renderLockOverlays(){
+  // Eski overlay larni tozalash
+  document.querySelectorAll('.lock-overlay').forEach(el=>el.remove());
+  const wrap=document.getElementById('canvas-inner');
+  if(!wrap) return;
+
+  Object.entries(strokeLocks).forEach(([strokeId,lock])=>{
+    // O'zimning lock ni ko'rsatmaymiz
+    if(lock.userId===me?.userId) return;
+    const s=curStrokes().find(s=>s.id===strokeId);
+    if(!s) return;
+    const b=getBounds(s);
+    if(!b) return;
+
+    // Screen koordinatalar
+    const x=b.x*scale+panX;
+    const y=b.y*scale+panY;
+    const w=b.w*scale;
+    const h=b.h*scale;
+    const pad=10;
+
+    const el=document.createElement('div');
+    el.className='lock-overlay';
+    el.style.cssText=`left:${x-pad}px;top:${y-pad}px;width:${w+pad*2}px;height:${h+pad*2}px`;
+
+    const border=document.createElement('div');
+    border.className='lock-overlay-border';
+    border.style.borderColor=lock.color;
+
+    const label=document.createElement('div');
+    label.className='lock-overlay-label';
+    label.style.background=lock.color;
+    label.textContent=`🔒 ${lock.name}`;
+
+    el.appendChild(border);
+    el.appendChild(label);
+    wrap.appendChild(el);
+  });
+}
 
 // ════ EXPORT ════
 function exportPNG(){
