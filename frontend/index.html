@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-<title>Whiteboard</title>
+<title>Dekuboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
@@ -329,15 +329,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);tou
 <!-- ══ LOBBY ══ -->
 <div id="lobby">
   <div class="lcard">
-    <div class="logo">✦ Whiteboard</div>
-    <div class="logo-sub">Real-time collaborative canvas</div>
+    <div class="logo">✦ Dekuboard</div>
+    <div class="logo-sub">Real vaqtda rasm chizish</div>
     <div class="tabs">
       <button class="tabbtn on" onclick="ltab('create')">Yangi xona</button>
       <button class="tabbtn" onclick="ltab('join')">Kirish</button>
     </div>
     <div id="lerr" class="lerr"></div>
     <div id="tp-create" class="tp on">
-      <div class="fg"><label>Ismingiz</label><input class="fi" id="l-name" placeholder="Alex, Sam..."/></div>
+      <div class="fg"><label>Ismingiz</label><input class="fi" id="l-name" placeholder="Javlon, Sarvar..."/></div>
       <div class="fg"><label>Xona nomi (ixtiyoriy)</label><input class="fi" id="l-rname" placeholder="Loyiha muhokamasi"/></div>
       <div class="fg"><label>Parol (ixtiyoriy)</label><input class="fi" type="password" id="l-pwd" placeholder="Himoyalash uchun"/></div>
       <div class="fg">
@@ -359,7 +359,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);tou
       <button class="fbtn fbtn-p" onclick="createRoom()">Xona yaratish →</button>
     </div>
     <div id="tp-join" class="tp">
-      <div class="fg"><label>Ismingiz</label><input class="fi" id="l-jname" placeholder="Alex, Sam..."/></div>
+      <div class="fg"><label>Ismingiz</label><input class="fi" id="l-jname" placeholder="Javlon, Sarvar..."/></div>
       <div class="fg"><label>Xona ID</label><input class="fi" id="l-jid" placeholder="8 belgili ID" maxlength="8" style="font-family:'DM Mono',monospace;letter-spacing:2px"/></div>
       <div class="fg" id="pwd-field" style="display:none"><label>Parol</label><input class="fi" type="password" id="l-jpwd"/></div>
       <button class="fbtn fbtn-p" onclick="joinRoom()">Kirish →</button>
@@ -659,7 +659,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);tou
 
 <script>
 // ════ CONFIG ════
-const SERVER_URL = 'https://whiteboard-backend-jeh6.onrender.com';
+const SERVER_URL = 'https://Dekuboard-backend-jeh6.onrender.com';
 
 // ════ PAPER SIZES ════
 const PAPER_SIZES = {
@@ -1651,7 +1651,7 @@ function exportPNG(){
     tmp.toBlob(async blob=>{
       const file=new File([blob],filename,{type:'image/png'});
       if(navigator.canShare({files:[file]})){
-        try{await navigator.share({files:[file],title:'Whiteboard'});return}catch(e){}
+        try{await navigator.share({files:[file],title:'Dekuboard'});return}catch(e){}
       }
       // Share ishlamasa oddiy download
       downloadBlob(blob,filename);
@@ -1787,14 +1787,14 @@ async function exportPDF(){
       pages[i].strokes.forEach(s=>drawStroke(tc,s));
       pdf.addImage(tmp.toDataURL('image/jpeg',.92),'JPEG',0,0,pd.w,pd.h);
     }
-    const filename=`whiteboard-${roomId}-${Date.now()}.pdf`;
+    const filename=`Dekuboard-${roomId}-${Date.now()}.pdf`;
     const blob=pdf.output('blob');
 
     // Mobil: Web Share API
     if(navigator.share&&navigator.canShare){
       const file=new File([blob],filename,{type:'application/pdf'});
       if(navigator.canShare({files:[file]})){
-        try{await navigator.share({files:[file],title:'Whiteboard PDF'});toast(`PDF (${pages.length} varoq)!`);return}catch(e){}
+        try{await navigator.share({files:[file],title:'Dekuboard PDF'});toast(`PDF (${pages.length} varoq)!`);return}catch(e){}
       }
     }
     // Desktop yoki share ishlamasa
