@@ -21,24 +21,24 @@ const io = new Server(server, {
 app.use(cors({ origin: CLIENT_URL }));
 app.use(express.json({ limit: '10mb' }));
 
-// ─── Foydalanuvchi ma'lumotlari ───────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 const USER_NAMES = ['Alex','Sam','Jordan','Taylor','Morgan','Casey','Riley','Avery','Quinn','Blake'];
 const USER_COLORS = ['#6c63ff','#ff6584','#43e97b','#f9c74f','#48cae4','#ff9f1c','#ef233c','#a8dadc','#e9c46a','#f4a261'];
-const onlineUsers = new Map(); // socketId -> user
+const onlineUsers = new Map();
 
-function getRandomItem(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
-
-function generateRoomId() {
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  return Array.from({length: 8}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+function getRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function genRoomId() {
+  const c = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  return Array.from({length:8}, () => c[Math.floor(Math.random()*c.length)]).join('');
 }
 
-function getRoomUsers(roomId) {
-  const users = [];
-  for (const [, u] of onlineUsers) {
-    if (u.roomId === roomId) users.push({ userId: u.userId, name: u.name, color: u.color });
-  }
-  return users;
+async function logActivity(roomId, user, action, detail='') {
+  try {
+    await pool.query(
+      `INSERT INTO activity_log (room_id, user_id, user_name, user_color, action, detail) VALUES ($1,$2,$3,$4,$5,$6)`,
+      [roomId, user.userId, user.name, user.color, action, detail]
+    );
+  } catch(e) { /* log xatosi asosiy jarayonni to'xtatmasin */ }
 }
 
 // ─── REST API ─────────────────────────────────────────────────────────────────
@@ -47,7 +47,7 @@ app.get('/health', (req, res) => res.json({ status: 'ok', time: new Date() }));
 app.post('/api/rooms', async (req, res) => {
   try {
     const { name, password } = req.body;
-    const roomId = generateRoomId();
+    const roomId = genRoomId();
     const passwordHash = password?.trim() ? await bcrypt.hash(password.trim(), 10) : null;
     await pool.query('INSERT INTO rooms (id, name, password_hash) VALUES ($1, $2, $3)', [roomId, name || `Xona ${roomId}`, passwordHash]);
     res.json({ roomId, hasPassword: !!passwordHash });
@@ -78,15 +78,36 @@ app.post('/api/rooms/:roomId/join', async (req, res) => {
 app.get('/api/rooms/:roomId/data', async (req, res) => {
   try {
     const { roomId } = req.params;
-    const [strokesRes, notesRes, chatRes] = await Promise.all([
+    const [strokesRes, notesRes, chatRes, activityRes] = await Promise.all([
       pool.query('SELECT * FROM strokes WHERE room_id = $1 ORDER BY created_at ASC', [roomId]),
       pool.query('SELECT * FROM sticky_notes WHERE room_id = $1 ORDER BY created_at ASC', [roomId]),
       pool.query('SELECT * FROM chat_messages WHERE room_id = $1 ORDER BY created_at ASC LIMIT 200', [roomId]),
+      pool.query('SELECT * FROM activity_log WHERE room_id = $1 ORDER BY created_at DESC LIMIT 100', [roomId]),
     ]);
     await pool.query('UPDATE rooms SET last_active = NOW() WHERE id = $1', [roomId]);
-    res.json({ strokes: strokesRes.rows, notes: notesRes.rows, chat: chatRes.rows });
+    res.json({
+      strokes: strokesRes.rows,
+      notes: notesRes.rows,
+      chat: chatRes.rows,
+      activity: activityRes.rows,
+    });
   } catch (err) {
     res.status(500).json({ error: 'Ma\'lumotlarni yuklashda xato' });
+  }
+});
+
+// Xona tarixi
+app.get('/api/rooms/:roomId/activity', async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const { limit = 50, offset = 0 } = req.query;
+    const result = await pool.query(
+      'SELECT * FROM activity_log WHERE room_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
+      [roomId, limit, offset]
+    );
+    res.json({ activity: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: 'Tarixni yuklashda xato' });
   }
 });
 
@@ -94,43 +115,41 @@ app.get('/api/rooms/:roomId/data', async (req, res) => {
 io.on('connection', (socket) => {
   console.log(`🔌 Connected: ${socket.id}`);
 
-  // ── Xonaga qo'shilish ──────────────────────────────────────────────────────
   socket.on('join-room', async ({ roomId, userId, preferredName }) => {
     try {
       const roomResult = await pool.query('SELECT id FROM rooms WHERE id = $1', [roomId]);
       if (roomResult.rows.length === 0) { socket.emit('error', { message: 'Xona topilmadi' }); return; }
-
       socket.join(roomId);
-
       const user = {
-        socketId: socket.id,
-        userId: userId || uuidv4(),
-        roomId,
-        name: preferredName || getRandomItem(USER_NAMES),
-        color: getRandomItem(USER_COLORS),
-        cursor: { x: 0, y: 0 },
+        socketId: socket.id, userId: userId || uuidv4(), roomId,
+        name: preferredName || getRandom(USER_NAMES),
+        color: getRandom(USER_COLORS),
       };
       onlineUsers.set(socket.id, user);
-
       socket.to(roomId).emit('user-joined', { userId: user.userId, name: user.name, color: user.color });
-
-      const roomUsers = getRoomUsers(roomId).filter(u => u.userId !== user.userId);
-      socket.emit('joined', {
-        user: { userId: user.userId, name: user.name, color: user.color },
-        onlineUsers: roomUsers,
-      });
+      const roomUsers = [];
+      for (const [, u] of onlineUsers) {
+        if (u.roomId === roomId && u.socketId !== socket.id)
+          roomUsers.push({ userId: u.userId, name: u.name, color: u.color });
+      }
+      socket.emit('joined', { user: { userId: user.userId, name: user.name, color: user.color }, onlineUsers: roomUsers });
+      // Tarixga yozish
+      logActivity(roomId, user, 'join', `${user.name} xonaga kirdi`);
+      io.to(roomId).emit('activity', { userId: user.userId, name: user.name, color: user.color, action: 'join', detail: `${user.name} xonaga kirdi`, createdAt: new Date().toISOString() });
     } catch (err) {
       console.error('Join error:', err);
       socket.emit('error', { message: 'Xonaga kira olmadingiz' });
     }
   });
 
-  // ── Ism o'zgartirish ───────────────────────────────────────────────────────
   socket.on('rename', ({ name }) => {
     const user = onlineUsers.get(socket.id);
     if (!user || !name?.trim()) return;
+    const oldName = user.name;
     user.name = name.trim().slice(0, 30);
     io.to(user.roomId).emit('user-renamed', { userId: user.userId, name: user.name });
+    logActivity(user.roomId, user, 'rename', `${oldName} → ${user.name}`);
+    io.to(user.roomId).emit('activity', { userId: user.userId, name: user.name, color: user.color, action: 'rename', detail: `Ism o'zgardi: ${oldName} → ${user.name}`, createdAt: new Date().toISOString() });
   });
 
   // ── Stroke events ──────────────────────────────────────────────────────────
@@ -144,6 +163,13 @@ io.on('connection', (socket) => {
     const user = onlineUsers.get(socket.id);
     if (!user) return;
     socket.to(user.roomId).emit('stroke-point', { ...data, userId: user.userId });
+  });
+
+  // Batch points (performance uchun)
+  socket.on('stroke-batch', (data) => {
+    const user = onlineUsers.get(socket.id);
+    if (!user) return;
+    socket.to(user.roomId).emit('stroke-batch', { ...data, userId: user.userId });
   });
 
   socket.on('stroke-end', async (data) => {
@@ -160,24 +186,27 @@ io.on('connection', (socket) => {
       );
       socket.to(user.roomId).emit('stroke-end', { ...data, userId: user.userId });
       pool.query('UPDATE rooms SET last_active = NOW() WHERE id = $1', [user.roomId]);
+
+      // Tool ga qarab tarix
+      const toolNames = { pen: 'Chizdi', eraser: 'O\'chirdi', line: 'Chiziq', rect: 'To\'rtburchak', circle: 'Doira', triangle: 'Uchburchak', arrow: 'O\'q', text: 'Matn yozdi', image: 'Rasm qo\'shdi' };
+      const detail = toolNames[tool] || tool;
+      logActivity(user.roomId, user, 'draw', detail);
+      io.to(user.roomId).emit('activity', { userId: user.userId, name: user.name, color: user.color, action: 'draw', detail, createdAt: new Date().toISOString() });
     } catch (err) { console.error('Stroke save error:', err); }
   });
 
-  // ── Shakl ko'chirish ───────────────────────────────────────────────────────
   socket.on('stroke-move', async (data) => {
     const user = onlineUsers.get(socket.id);
     if (!user) return;
     try {
-      const { strokeId, dx, dy, newPoints, newShapeData } = data;
       await pool.query(
         `UPDATE strokes SET points=$1, shape_data=$2 WHERE id=$3 AND room_id=$4`,
-        [JSON.stringify(newPoints || []), JSON.stringify(newShapeData || null), strokeId, user.roomId]
+        [JSON.stringify(data.newPoints || []), JSON.stringify(data.newShapeData || null), data.strokeId, user.roomId]
       );
       socket.to(user.roomId).emit('stroke-move', { ...data, userId: user.userId });
     } catch (err) { console.error('Stroke move error:', err); }
   });
 
-  // ── Z-index (qatlam tartibi) ───────────────────────────────────────────────
   socket.on('stroke-zindex', async ({ strokeId, zIndex }) => {
     const user = onlineUsers.get(socket.id);
     if (!user) return;
@@ -187,7 +216,6 @@ io.on('connection', (socket) => {
     } catch (err) { console.error('Z-index error:', err); }
   });
 
-  // ── Rasm yuklash ───────────────────────────────────────────────────────────
   socket.on('image-add', async (data) => {
     const user = onlineUsers.get(socket.id);
     if (!user) return;
@@ -201,18 +229,18 @@ io.on('connection', (socket) => {
       );
       socket.to(user.roomId).emit('image-add', { ...data, strokeId, userId: user.userId });
       socket.emit('image-saved', { strokeId });
+      logActivity(user.roomId, user, 'draw', 'Rasm qo\'shdi');
+      io.to(user.roomId).emit('activity', { userId: user.userId, name: user.name, color: user.color, action: 'image', detail: 'Rasm qo\'shdi', createdAt: new Date().toISOString() });
     } catch (err) { console.error('Image save error:', err); }
   });
 
-  // ── Rasm o'lchamini o'zgartirish ───────────────────────────────────────────
   socket.on('image-resize', async (data) => {
     const user = onlineUsers.get(socket.id);
     if (!user) return;
     try {
-      const { strokeId, x, y, width, height } = data;
       await pool.query(
         `UPDATE strokes SET shape_data=$1 WHERE id=$2 AND room_id=$3`,
-        [JSON.stringify({ x, y, width, height }), strokeId, user.roomId]
+        [JSON.stringify({ x: data.x, y: data.y, width: data.width, height: data.height }), data.strokeId, user.roomId]
       );
       socket.to(user.roomId).emit('image-resize', { ...data, userId: user.userId });
     } catch (err) { console.error('Image resize error:', err); }
@@ -230,6 +258,8 @@ io.on('connection', (socket) => {
       );
       socket.to(user.roomId).emit('note-add', { ...data, noteId, userId: user.userId });
       socket.emit('note-saved', { noteId });
+      logActivity(user.roomId, user, 'note', 'Sticky note qo\'shdi');
+      io.to(user.roomId).emit('activity', { userId: user.userId, name: user.name, color: user.color, action: 'note', detail: 'Sticky note qo\'shdi', createdAt: new Date().toISOString() });
     } catch (err) { console.error('Note add error:', err); }
   });
 
@@ -260,24 +290,32 @@ io.on('connection', (socket) => {
     if (!user || !text?.trim()) return;
     try {
       const msgId = uuidv4();
-      const msg = {
-        id: msgId, userId: user.userId, name: user.name,
-        color: user.color, text: text.trim().slice(0, 500),
-        createdAt: new Date().toISOString(),
-      };
+      const msg = { id: msgId, userId: user.userId, name: user.name, color: user.color, text: text.trim().slice(0, 500), createdAt: new Date().toISOString() };
       await pool.query(
         `INSERT INTO chat_messages (id, room_id, user_id, user_name, user_color, text) VALUES ($1,$2,$3,$4,$5,$6)`,
         [msgId, user.roomId, user.userId, user.name, user.color, msg.text]
       );
       io.to(user.roomId).emit('chat-message', msg);
+      logActivity(user.roomId, user, 'chat', `"${msg.text.slice(0, 40)}${msg.text.length > 40 ? '...' : ''}"`);
+      io.to(user.roomId).emit('activity', { userId: user.userId, name: user.name, color: user.color, action: 'chat', detail: `Chat: "${msg.text.slice(0, 30)}${msg.text.length > 30 ? '...' : ''}"`, createdAt: new Date().toISOString() });
     } catch (err) { console.error('Chat error:', err); }
   });
 
-  // ── Reaktsiyalar ───────────────────────────────────────────────────────────
+  // ── Reactions ──────────────────────────────────────────────────────────────
   socket.on('reaction', ({ emoji, x, y }) => {
     const user = onlineUsers.get(socket.id);
     if (!user) return;
-    io.to(user.roomId).emit('reaction', { emoji, x, y, userId: user.userId, name: user.name });
+    // Barcha foydalanuvchilarga yuborish (o'ziga ham)
+    io.to(user.roomId).emit('reaction', { emoji, x, y, userId: user.userId, name: user.name, color: user.color });
+  });
+
+  // ── Varoq nom ──────────────────────────────────────────────────────────────
+  socket.on('page-rename', ({ pageIdx, name }) => {
+    const user = onlineUsers.get(socket.id);
+    if (!user) return;
+    socket.to(user.roomId).emit('page-rename', { pageIdx, name });
+    logActivity(user.roomId, user, 'page', `Varoq nomlandi: "${name}"`);
+    io.to(user.roomId).emit('activity', { userId: user.userId, name: user.name, color: user.color, action: 'page', detail: `Varoq nomlandi: "${name}"`, createdAt: new Date().toISOString() });
   });
 
   // ── Undo ───────────────────────────────────────────────────────────────────
@@ -289,14 +327,15 @@ io.on('connection', (socket) => {
         `DELETE FROM strokes WHERE id = (SELECT id FROM strokes WHERE room_id=$1 AND user_id=$2 ORDER BY created_at DESC LIMIT 1) RETURNING id`,
         [user.roomId, user.userId]
       );
-      if (result.rows.length > 0) io.to(user.roomId).emit('stroke-removed', { strokeId: result.rows[0].id });
+      if (result.rows.length > 0) {
+        io.to(user.roomId).emit('stroke-removed', { strokeId: result.rows[0].id });
+        logActivity(user.roomId, user, 'undo', 'Bekor qildi');
+        io.to(user.roomId).emit('activity', { userId: user.userId, name: user.name, color: user.color, action: 'undo', detail: 'Bekor qildi', createdAt: new Date().toISOString() });
+      }
     } catch (err) { console.error('Undo error:', err); }
   });
 
-  // ── Redo ───────────────────────────────────────────────────────────────────
-  // Redo uchun client side history ishlatiladi
-
-  // ── Hammasini tozalash ─────────────────────────────────────────────────────
+  // ── Clear ──────────────────────────────────────────────────────────────────
   socket.on('clear-board', async () => {
     const user = onlineUsers.get(socket.id);
     if (!user) return;
@@ -304,6 +343,8 @@ io.on('connection', (socket) => {
       await pool.query('DELETE FROM strokes WHERE room_id=$1', [user.roomId]);
       await pool.query('DELETE FROM sticky_notes WHERE room_id=$1', [user.roomId]);
       io.to(user.roomId).emit('board-cleared');
+      logActivity(user.roomId, user, 'clear', 'Hammani tozaladi');
+      io.to(user.roomId).emit('activity', { userId: user.userId, name: user.name, color: user.color, action: 'clear', detail: 'Hammani tozaladi', createdAt: new Date().toISOString() });
     } catch (err) { console.error('Clear error:', err); }
   });
 
@@ -319,8 +360,11 @@ io.on('connection', (socket) => {
     const user = onlineUsers.get(socket.id);
     if (user) {
       socket.to(user.roomId).emit('user-left', { userId: user.userId, name: user.name });
+      logActivity(user.roomId, user, 'leave', `${user.name} xonani tark etdi`);
+      io.to(user.roomId).emit('activity', { userId: user.userId, name: user.name, color: user.color, action: 'leave', detail: `${user.name} xonani tark etdi`, createdAt: new Date().toISOString() });
       onlineUsers.delete(socket.id);
     }
+    console.log(`🔌 Disconnected: ${socket.id}`);
   });
 });
 
