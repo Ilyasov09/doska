@@ -878,12 +878,6 @@ function connectSocket(id,preferredName){
     selectedId=null;isDragging=false;resizing=null;redraw();
   });
 
-  // ── Lock events ──────────────────────────────────────────────────────────
-      toast(`⛔ ${u?.name||'Boshqa kishi'} bu elementni ishlatmoqda`);
-    // Harakatni bekor qilish
-    selectedId=null;isDragging=false;resizing=null;
-    redraw();
-  });
   socket.on('error',({message})=>toast('⚠️ '+message));
 }
 
