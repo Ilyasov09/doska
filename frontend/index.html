@@ -6,362 +6,294 @@
 <title>Whiteboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <style>
-/* ══════════════════════════════════════════════
-   RESET & VARIABLES
-══════════════════════════════════════════════ */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0c0c10;
-  --surface:#15151c;
-  --surface2:#1e1e28;
-  --surface3:#252535;
-  --border:#2a2a3a;
-  --border2:#363648;
-  --accent:#7c6dfa;
-  --accent-dim:rgba(124,109,250,.15);
-  --accent2:#ff6b8a;
-  --text:#e2e2ee;
-  --text2:#8888a8;
-  --text3:#454560;
+  --bg:#0c0c10;--surface:#15151c;--surface2:#1e1e28;
+  --border:#2a2a3a;--border2:#363648;
+  --accent:#7c6dfa;--adim:rgba(124,109,250,.15);--accent2:#ff6b8a;
+  --text:#e2e2ee;--text2:#8888a8;--text3:#454560;
   --shadow:0 12px 40px rgba(0,0,0,.6);
-  --radius:12px;
-  --toolbar-h:52px;
+  --paper:#1c1c28;--paper-sh:0 8px 40px rgba(0,0,0,.6);
+  --cbg:#0a0a12;--grid:rgba(255,255,255,.025);
+}
+:root.light{
+  --bg:#dde1ea;--surface:#fff;--surface2:#f5f5fa;
+  --border:#d0d0e0;--border2:#c0c0d0;
+  --accent:#6c5ce7;--adim:rgba(108,92,231,.1);--accent2:#e84393;
+  --text:#1a1a2e;--text2:#6666aa;--text3:#aaaacc;
+  --shadow:0 8px 32px rgba(0,0,0,.1);
+  --paper:#fff;--paper-sh:0 4px 24px rgba(0,0,0,.12);
+  --cbg:#cdd1da;--grid:rgba(0,0,0,.04);
 }
 html,body{height:100%;overflow:hidden}
-body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);user-select:none}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text)}
 
-/* ══════════════════════════════════════════════
-   LOBBY
-══════════════════════════════════════════════ */
-#lobby{
-  position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
-  background:var(--bg);z-index:2000;transition:opacity .4s,visibility .4s;
-}
+/* ══ LOBBY ══ */
+#lobby{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:2000;transition:opacity .4s,visibility .4s}
 #lobby.out{opacity:0;visibility:hidden;pointer-events:none}
-#lobby::before{
-  content:'';position:absolute;inset:0;
-  background:
-    radial-gradient(ellipse 700px 500px at 65% 35%,rgba(124,109,250,.07) 0%,transparent 70%),
-    radial-gradient(ellipse 500px 400px at 15% 75%,rgba(255,107,138,.05) 0%,transparent 65%);
-  pointer-events:none;
-}
-.lcard{
-  position:relative;width:440px;background:var(--surface);
-  border:1px solid var(--border);border-radius:20px;padding:44px;box-shadow:var(--shadow);
-}
-.logo{
-  font-size:26px;font-weight:600;letter-spacing:-.5px;margin-bottom:6px;
-  background:linear-gradient(135deg,#7c6dfa,#ff6b8a);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-}
-.logo-sub{font-size:13px;color:var(--text2);margin-bottom:30px}
-.tabs{display:flex;background:var(--bg);border-radius:10px;padding:3px;margin-bottom:22px}
-.tab-btn{
-  flex:1;padding:8px;text-align:center;font-size:13px;font-weight:500;color:var(--text2);
-  border-radius:8px;cursor:pointer;transition:.2s;border:none;background:transparent;font-family:'DM Sans',sans-serif;
-}
-.tab-btn.on{background:var(--surface2);color:var(--text)}
+.lcard{position:relative;width:440px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:44px;box-shadow:var(--shadow)}
+.logo{font-size:26px;font-weight:600;letter-spacing:-.5px;margin-bottom:6px;background:linear-gradient(135deg,#7c6dfa,#ff6b8a);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.logo-sub{font-size:13px;color:var(--text2);margin-bottom:28px}
+.tabs{display:flex;background:var(--bg);border-radius:10px;padding:3px;margin-bottom:20px}
+.tabbtn{flex:1;padding:8px;text-align:center;font-size:13px;font-weight:500;color:var(--text2);border-radius:8px;cursor:pointer;transition:.2s;border:none;background:transparent;font-family:'DM Sans',sans-serif}
+.tabbtn.on{background:var(--surface2);color:var(--text)}
 .tp{display:none}.tp.on{display:block}
-.fg{margin-bottom:14px}
+.fg{margin-bottom:13px}
 .fg label{display:block;font-size:11px;font-weight:500;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.6px}
-.fi{
-  width:100%;padding:11px 13px;background:var(--bg);border:1px solid var(--border);
-  border-radius:9px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;
-  outline:none;transition:.2s;
-}
+.fi{width:100%;padding:11px 13px;background:var(--bg);border:1px solid var(--border);border-radius:9px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;transition:.2s}
 .fi:focus{border-color:var(--accent)}
-.fi-row{display:flex;gap:8px}
+.fi-row{display:flex;gap:8px;align-items:center}
 .fi-row .fi{flex:1}
-.btn{
-  width:100%;padding:12px;border:none;border-radius:9px;
-  font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:.2s;
-}
-.btn-p{background:var(--accent);color:#fff}
-.btn-p:hover{background:#6a5ce8;transform:translateY(-1px)}
-.btn-p:active{transform:translateY(0)}
-.btn-s{background:var(--surface2);color:var(--text);margin-top:8px}
-.btn-s:hover{background:var(--border)}
-.err{
-  background:rgba(255,107,138,.1);border:1px solid rgba(255,107,138,.25);
-  color:#ff8fa3;padding:10px 13px;border-radius:8px;font-size:13px;
-  margin-bottom:14px;display:none;
-}
+.fi-row span{color:var(--text2);font-size:13px}
+.fbtn{width:100%;padding:12px;border:none;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:.2s}
+.fbtn-p{background:var(--accent);color:#fff}.fbtn-p:hover{background:#6a5ce8;transform:translateY(-1px)}
+.fbtn-s{background:var(--surface2);color:var(--text);margin-top:8px}.fbtn-s:hover{background:var(--border)}
+.lerr{background:rgba(255,107,138,.1);border:1px solid rgba(255,107,138,.25);color:#ff8fa3;padding:10px 13px;border-radius:8px;font-size:13px;margin-bottom:13px;display:none}
 
-/* ══════════════════════════════════════════════
-   APP SHELL
-══════════════════════════════════════════════ */
-#app{
-  position:fixed;inset:0;display:flex;flex-direction:column;
-  visibility:hidden;
-}
+/* ══ APP ══ */
+#app{position:fixed;inset:0;display:flex;flex-direction:column;visibility:hidden}
 #app.on{visibility:visible}
 
-/* ══════════════════════════════════════════════
-   TOOLBAR
-══════════════════════════════════════════════ */
+/* ══ TOOLBAR ══ */
 #toolbar{
-  height:var(--toolbar-h);display:flex;align-items:center;gap:4px;
-  padding:0 10px;background:var(--surface);border-bottom:1px solid var(--border);
+  height:50px;display:flex;align-items:center;gap:3px;padding:0 8px;
+  background:var(--surface);border-bottom:1px solid var(--border);
   flex-shrink:0;z-index:100;overflow-x:auto;overflow-y:hidden;
 }
 #toolbar::-webkit-scrollbar{height:0}
-.tg{display:flex;align-items:center;gap:2px;padding:0 6px;border-right:1px solid var(--border)}
+.tg{display:flex;align-items:center;gap:2px;padding:0 5px;border-right:1px solid var(--border);flex-shrink:0}
 .tg:last-child{border-right:none;margin-left:auto}
 .tb{
-  width:32px;height:32px;display:flex;align-items:center;justify-content:center;
-  border:none;background:transparent;color:var(--text2);border-radius:7px;
-  cursor:pointer;transition:.15s;font-size:15px;position:relative;flex-shrink:0;
+  width:30px;height:30px;display:flex;align-items:center;justify-content:center;
+  border:none;background:transparent;color:var(--text2);border-radius:6px;
+  cursor:pointer;transition:.15s;font-size:14px;position:relative;flex-shrink:0;
   font-family:'DM Sans',sans-serif;
 }
 .tb:hover{background:var(--surface2);color:var(--text)}
-.tb.on{background:var(--accent-dim);color:var(--accent)}
+.tb.on{background:var(--adim);color:var(--accent)}
 .tb[data-tip]:hover::after{
-  content:attr(data-tip);position:absolute;bottom:-30px;left:50%;transform:translateX(-50%);
+  content:attr(data-tip);position:absolute;bottom:-28px;left:50%;transform:translateX(-50%);
   background:var(--surface2);color:var(--text);padding:3px 7px;border-radius:5px;
   font-size:11px;white-space:nowrap;z-index:999;border:1px solid var(--border);pointer-events:none;
 }
-.sep{width:1px;height:22px;background:var(--border);margin:0 2px;flex-shrink:0}
-
-/* Color swatches */
-.csw{
-  width:20px;height:20px;border-radius:50%;cursor:pointer;
-  border:2px solid transparent;transition:.15s;flex-shrink:0;
-}
+.sep{width:1px;height:20px;background:var(--border);margin:0 2px;flex-shrink:0}
+.csw{width:18px;height:18px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:.15s;flex-shrink:0}
 .csw:hover,.csw.on{border-color:var(--text);transform:scale(1.2)}
-#color-custom{width:20px;height:20px;padding:0;border:2px solid var(--border);border-radius:50%;cursor:pointer;overflow:hidden;flex-shrink:0}
-
-/* Range */
-.rng{-webkit-appearance:none;height:3px;background:var(--border2);border-radius:2px;outline:none;cursor:pointer;width:72px}
-.rng::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;background:var(--accent);border-radius:50%;cursor:pointer}
-.rlbl{font-size:11px;color:var(--text2);min-width:24px;text-align:center;font-family:'DM Mono',monospace}
-
-/* Zoom display */
-#zoom-display{font-size:11px;color:var(--text2);font-family:'DM Mono',monospace;min-width:38px;text-align:center;cursor:pointer}
-#zoom-display:hover{color:var(--accent)}
-
-/* User avatars */
-.uav{
-  width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  font-size:10px;font-weight:600;color:#fff;border:2px solid var(--bg);
-  margin-left:-5px;cursor:pointer;flex-shrink:0;transition:.15s;
-}
+#color-custom{width:18px;height:18px;padding:0;border:2px solid var(--border);border-radius:50%;cursor:pointer;overflow:hidden;flex-shrink:0}
+.rng{-webkit-appearance:none;height:3px;background:var(--border2);border-radius:2px;outline:none;cursor:pointer;width:68px}
+.rng::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;background:var(--accent);border-radius:50%;cursor:pointer}
+.rlbl{font-size:11px;color:var(--text2);min-width:22px;text-align:center;font-family:'DM Mono',monospace}
+#zoom-disp{font-size:11px;color:var(--text2);font-family:'DM Mono',monospace;min-width:36px;text-align:center;cursor:pointer;padding:3px 5px;border-radius:4px;transition:.15s}
+#zoom-disp:hover{background:var(--surface2);color:var(--accent)}
+.uav{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#fff;border:2px solid var(--bg);margin-left:-4px;cursor:pointer;flex-shrink:0;transition:.15s}
 .uav:first-child{margin-left:0}
-.uav:hover{transform:scale(1.15);z-index:1}
-#room-chip{
-  font-size:11px;color:var(--text2);background:var(--surface2);
-  padding:4px 9px;border-radius:7px;cursor:pointer;
-  font-family:'DM Mono',monospace;border:1px solid var(--border);transition:.15s;
-}
+.uav:hover{transform:scale(1.15)}
+#room-chip{font-size:11px;color:var(--text2);background:var(--surface2);padding:4px 8px;border-radius:7px;cursor:pointer;font-family:'DM Mono',monospace;border:1px solid var(--border);transition:.15s;white-space:nowrap}
 #room-chip:hover{color:var(--accent);border-color:var(--accent)}
+#chat-badge{position:absolute;top:-3px;right:-3px;width:14px;height:14px;background:var(--accent2);border-radius:50%;font-size:9px;font-weight:700;color:#fff;display:none;align-items:center;justify-content:center}
+#chat-badge.show{display:flex}
 
-/* ══════════════════════════════════════════════
-   CANVAS AREA
-══════════════════════════════════════════════ */
+/* ══ MAIN AREA ══ */
+#main-area{flex:1;display:flex;overflow:hidden}
+
+/* ══ PAGES SIDEBAR ══ */
+#pages-sidebar{
+  width:120px;background:var(--surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;flex-shrink:0;z-index:50;overflow:hidden;
+}
+#pages-sidebar.hidden{width:0;border-right:none}
+#pages-header{padding:10px 8px 6px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+#pages-title{font-size:11px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.5px}
+#add-page-btn{width:22px;height:22px;border:none;background:var(--accent);border-radius:5px;cursor:pointer;color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;transition:.15s}
+#add-page-btn:hover{background:#6a5ce8}
+#pages-list{flex:1;overflow-y:auto;padding:6px}
+#pages-list::-webkit-scrollbar{width:3px}
+#pages-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.page-thumb{
+  position:relative;border-radius:8px;margin-bottom:6px;cursor:pointer;
+  border:2px solid var(--border);transition:.15s;overflow:hidden;
+  background:var(--paper);
+}
+.page-thumb:hover{border-color:var(--accent)}
+.page-thumb.active{border-color:var(--accent);box-shadow:0 0 0 2px var(--adim)}
+.page-thumb canvas{width:100%;display:block;border-radius:6px}
+.page-thumb-label{
+  position:absolute;bottom:0;left:0;right:0;
+  background:rgba(0,0,0,.5);color:#fff;font-size:9px;
+  text-align:center;padding:2px 0;border-radius:0 0 6px 6px;
+}
+:root.light .page-thumb-label{background:rgba(255,255,255,.7);color:#333}
+.page-del-btn{
+  position:absolute;top:3px;right:3px;width:16px;height:16px;
+  background:rgba(255,107,138,.8);border:none;border-radius:50%;
+  cursor:pointer;color:#fff;font-size:10px;display:none;
+  align-items:center;justify-content:center;
+}
+.page-thumb:hover .page-del-btn{display:flex}
+
+/* ══ CANVAS WRAP ══ */
 #wrap{
   flex:1;position:relative;overflow:hidden;
-  background:#14141e;
-  background-image:
-    linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),
-    linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);
+  background:var(--cbg);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
   background-size:32px 32px;
 }
 #main-canvas,#overlay-canvas{position:absolute;top:0;left:0;width:100%;height:100%}
 #overlay-canvas{pointer-events:none}
 #cursors-layer,#notes-layer,#reactions-layer{position:absolute;inset:0;pointer-events:none;z-index:300}
-#notes-layer{z-index:250}
-#reactions-layer{z-index:400;pointer-events:none}
+#notes-layer{z-index:250;pointer-events:none}
+#reactions-layer{z-index:400}
 
-/* ══════════════════════════════════════════════
-   REMOTE CURSORS
-══════════════════════════════════════════════ */
-.rcursor{
-  position:absolute;pointer-events:none;transition:left .06s,top .06s;
-}
-.rcursor svg{filter:drop-shadow(1px 2px 4px rgba(0,0,0,.5))}
-.rcursor-label{
-  position:absolute;top:22px;left:10px;
-  padding:2px 7px;border-radius:12px;font-size:10px;font-weight:600;
-  color:#fff;white-space:nowrap;
+/* ══ PAPER SHADOW ══ */
+.paper-indicator{
+  position:absolute;pointer-events:none;border-radius:2px;
+  box-shadow:var(--paper-sh);z-index:0;
+  background:var(--paper);transition:background .3s;
 }
 
-/* ══════════════════════════════════════════════
-   STICKY NOTES
-══════════════════════════════════════════════ */
-.snote{
-  position:absolute;border-radius:10px;padding:8px;
-  box-shadow:0 4px 24px rgba(0,0,0,.35);
-  resize:both;overflow:auto;z-index:250;
-  pointer-events:all;min-width:160px;min-height:100px;
+/* ══ RULER ══ */
+#ruler-h,#ruler-v{
+  position:absolute;background:var(--surface);border:1px solid var(--border);
+  z-index:50;pointer-events:none;overflow:hidden;
 }
-.snote-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:4px}
-.snote-colors{display:flex;gap:3px}
-.snote-dot{width:13px;height:13px;border-radius:50%;cursor:pointer;border:1px solid rgba(0,0,0,.15);flex-shrink:0}
-.snote-del{
-  width:18px;height:18px;border:none;background:rgba(0,0,0,.15);
-  border-radius:50%;cursor:pointer;font-size:11px;color:#333;
-  display:flex;align-items:center;justify-content:center;opacity:.5;flex-shrink:0;
-}
+#ruler-h{top:0;left:24px;right:0;height:24px;border-left:none;border-top:none;border-right:none}
+#ruler-v{left:0;top:24px;bottom:0;width:24px;border-top:none;border-left:none;border-bottom:none}
+#ruler-corner{position:absolute;top:0;left:0;width:24px;height:24px;background:var(--surface);border-bottom:1px solid var(--border);border-right:1px solid var(--border);z-index:51}
+.ruler-line{position:absolute;background:var(--text3)}
+#ruler-cursor-h{position:absolute;top:0;bottom:0;width:1px;background:var(--accent2);opacity:.7;pointer-events:none}
+#ruler-cursor-v{position:absolute;left:0;right:0;height:1px;background:var(--accent2);opacity:.7;pointer-events:none}
+#canvas-inner{position:absolute;inset:0;overflow:hidden}
+#canvas-inner.ruler-on{top:24px;left:24px}
+
+/* ══ REMOTE CURSORS ══ */
+.rcursor{position:absolute;pointer-events:none;transition:left .06s,top .06s}
+.rcursor-label{position:absolute;top:22px;left:8px;padding:2px 7px;border-radius:12px;font-size:10px;font-weight:600;color:#fff;white-space:nowrap}
+
+/* ══ STICKY NOTES ══ */
+.snote{position:absolute;border-radius:10px;padding:8px;box-shadow:0 4px 24px rgba(0,0,0,.3);resize:both;overflow:auto;z-index:250;pointer-events:all;min-width:150px;min-height:100px}
+.snote-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;gap:4px}
+.snote-cols{display:flex;gap:3px}
+.snote-dot{width:12px;height:12px;border-radius:50%;cursor:pointer;border:1px solid rgba(0,0,0,.15);flex-shrink:0}
+.snote-del{width:17px;height:17px;border:none;background:rgba(0,0,0,.12);border-radius:50%;cursor:pointer;font-size:10px;color:#333;display:flex;align-items:center;justify-content:center;opacity:.5;flex-shrink:0}
 .snote-del:hover{opacity:1;background:rgba(255,0,0,.2)}
-.snote textarea{
-  width:100%;height:calc(100% - 32px);background:transparent;border:none;
-  outline:none;font-family:'DM Sans',sans-serif;font-size:13px;
-  color:#1a1a2e;resize:none;line-height:1.5;pointer-events:all;
-}
+.snote textarea{width:100%;height:calc(100% - 30px);background:transparent;border:none;outline:none;font-family:'DM Sans',sans-serif;font-size:13px;color:#1a1a2e;resize:none;line-height:1.5;pointer-events:all}
 
-/* ══════════════════════════════════════════════
-   CHAT PANEL
-══════════════════════════════════════════════ */
-#chat-panel{
-  position:absolute;right:0;top:0;bottom:0;width:280px;
-  background:var(--surface);border-left:1px solid var(--border);
-  display:flex;flex-direction:column;z-index:200;
-  transform:translateX(100%);transition:transform .25s;
-  pointer-events:all;
-}
+/* ══ CHAT ══ */
+#chat-panel{position:absolute;right:0;top:0;bottom:0;width:272px;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;z-index:200;transform:translateX(100%);transition:transform .25s;pointer-events:all}
 #chat-panel.open{transform:translateX(0)}
-#chat-header{
-  padding:14px 16px;border-bottom:1px solid var(--border);
-  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
-}
+#chat-hdr{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 #chat-title{font-size:14px;font-weight:500}
-#chat-close{
-  width:26px;height:26px;border:none;background:var(--surface2);
-  border-radius:6px;cursor:pointer;color:var(--text2);font-size:14px;
-  display:flex;align-items:center;justify-content:center;
-}
-#chat-close:hover{background:var(--border);color:var(--text)}
-#chat-msgs{
-  flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;
-}
-#chat-msgs::-webkit-scrollbar{width:4px}
+#chat-close{width:24px;height:24px;border:none;background:var(--surface2);border-radius:6px;cursor:pointer;color:var(--text2);font-size:13px;display:flex;align-items:center;justify-content:center}
+#chat-close:hover{background:var(--border)}
+#chat-msgs{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:7px}
+#chat-msgs::-webkit-scrollbar{width:3px}
 #chat-msgs::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 .cmsg{display:flex;flex-direction:column;gap:2px}
-.cmsg-meta{display:flex;align-items:center;gap:6px}
-.cmsg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.cmsg-meta{display:flex;align-items:center;gap:5px}
+.cmsg-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .cmsg-name{font-size:11px;font-weight:500;color:var(--text2)}
 .cmsg-time{font-size:10px;color:var(--text3);margin-left:auto}
-.cmsg-text{
-  font-size:13px;color:var(--text);line-height:1.5;
-  background:var(--surface2);padding:7px 10px;border-radius:8px;
-  border-top-left-radius:2px;word-break:break-word;
-}
-.cmsg.mine .cmsg-text{background:var(--accent-dim);border-top-left-radius:8px;border-top-right-radius:2px}
+.cmsg-text{font-size:13px;color:var(--text);line-height:1.5;background:var(--surface2);padding:6px 10px;border-radius:8px;border-top-left-radius:2px;word-break:break-word}
+.cmsg.mine .cmsg-text{background:var(--adim);border-top-left-radius:8px;border-top-right-radius:2px}
 .cmsg.mine .cmsg-meta{flex-direction:row-reverse}
-#chat-input-wrap{
-  padding:10px;border-top:1px solid var(--border);display:flex;gap:6px;flex-shrink:0;
-}
-#chat-input{
-  flex:1;background:var(--surface2);border:1px solid var(--border);
-  border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;
-  font-size:13px;padding:8px 10px;outline:none;resize:none;height:36px;
-  transition:.2s;
-}
-#chat-input:focus{border-color:var(--accent)}
-#chat-send{
-  width:34px;height:36px;background:var(--accent);border:none;border-radius:8px;
-  cursor:pointer;color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;
-  flex-shrink:0;transition:.15s;
-}
+#chat-inp-wrap{padding:8px;border-top:1px solid var(--border);display:flex;gap:5px;flex-shrink:0}
+#chat-inp{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:7px 10px;outline:none;resize:none;height:34px;transition:.2s}
+#chat-inp:focus{border-color:var(--accent)}
+#chat-send{width:32px;height:34px;background:var(--accent);border:none;border-radius:8px;cursor:pointer;color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s}
 #chat-send:hover{background:#6a5ce8}
-#chat-badge{
-  position:absolute;top:-4px;right:-4px;width:16px;height:16px;
-  background:var(--accent2);border-radius:50%;font-size:9px;font-weight:700;
-  color:#fff;display:none;align-items:center;justify-content:center;
-}
-#chat-badge.show{display:flex}
 
-/* ══════════════════════════════════════════════
-   REACTIONS
-══════════════════════════════════════════════ */
-.reaction-float{
-  position:absolute;font-size:28px;pointer-events:none;
-  animation:rfloat 2.5s ease-out forwards;z-index:401;
-}
-@keyframes rfloat{
-  0%{transform:scale(0) translateY(0);opacity:1}
-  20%{transform:scale(1.3) translateY(-10px);opacity:1}
-  100%{transform:scale(0.8) translateY(-80px);opacity:0}
-}
+/* ══ REACTIONS ══ */
+.rfloat{position:absolute;font-size:28px;pointer-events:none;animation:rfloat 2.5s ease-out forwards;z-index:401}
+@keyframes rfloat{0%{transform:scale(0) translateY(0);opacity:1}20%{transform:scale(1.3) translateY(-10px);opacity:1}100%{transform:scale(.8) translateY(-80px);opacity:0}}
 
-/* ══════════════════════════════════════════════
-   RENAME MODAL
-══════════════════════════════════════════════ */
-#rename-modal{
-  position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:3000;
-  display:none;align-items:center;justify-content:center;
+/* ══ REACTION PICKER ══ */
+#rpicker{
+  display:none;position:absolute;background:var(--surface2);border:1px solid var(--border);
+  border-radius:10px;padding:8px;gap:4px;flex-wrap:wrap;width:148px;
+  top:46px;z-index:500;box-shadow:var(--shadow);
 }
-#rename-modal.show{display:flex}
-#rename-card{
-  background:var(--surface);border:1px solid var(--border);border-radius:16px;
-  padding:28px;width:320px;box-shadow:var(--shadow);
-}
-#rename-card h3{font-size:16px;font-weight:500;margin-bottom:16px}
-#rename-input{
-  width:100%;padding:11px 13px;background:var(--bg);border:1px solid var(--border);
-  border-radius:9px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;
-  outline:none;margin-bottom:14px;transition:.2s;
-}
-#rename-input:focus{border-color:var(--accent)}
-.rename-btns{display:flex;gap:8px}
-.rename-btns button{flex:1;padding:10px;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer}
-#rename-ok{background:var(--accent);color:#fff}
-#rename-ok:hover{background:#6a5ce8}
-#rename-cancel{background:var(--surface2);color:var(--text)}
-#rename-cancel:hover{background:var(--border)}
+#rpicker span{font-size:20px;cursor:pointer;transition:.15s;border-radius:6px;padding:2px}
+#rpicker span:hover{background:var(--border);transform:scale(1.2)}
 
-/* ══════════════════════════════════════════════
-   SELECTION BOX
-══════════════════════════════════════════════ */
-#selection-box{
-  position:absolute;border:2px dashed var(--accent);pointer-events:none;
-  border-radius:4px;display:none;background:rgba(124,109,250,.05);
-}
+/* ══ TABLE WIDGET ══ */
+.wb-table{position:absolute;z-index:220;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:var(--shadow);pointer-events:all;min-width:200px}
+.wb-table-hdr{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--surface2);border-bottom:1px solid var(--border);cursor:move;user-select:none}
+.wb-table-title{font-size:12px;font-weight:500;color:var(--text2)}
+.wb-table-btns{display:flex;gap:4px}
+.wb-table-btn{width:18px;height:18px;border:none;background:transparent;cursor:pointer;color:var(--text2);font-size:11px;border-radius:4px;display:flex;align-items:center;justify-content:center}
+.wb-table-btn:hover{background:var(--border);color:var(--text)}
+.wb-table table{border-collapse:collapse;width:100%}
+.wb-table td{border:1px solid var(--border);min-width:80px;height:28px}
+.wb-table td input{width:100%;height:100%;border:none;background:transparent;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;padding:0 6px;outline:none}
+.wb-table td input:focus{background:var(--adim)}
+.wb-table th-row td{background:var(--surface2)}
+.wb-table th-row td input{font-weight:500;color:var(--accent)}
 
-/* ══════════════════════════════════════════════
-   CONTEXT MENU
-══════════════════════════════════════════════ */
-#ctx{
-  position:fixed;background:var(--surface);border:1px solid var(--border);
-  border-radius:10px;padding:5px;min-width:160px;box-shadow:var(--shadow);
-  z-index:1000;display:none;
-}
-.ci{
-  padding:7px 12px;border-radius:7px;cursor:pointer;font-size:13px;
-  display:flex;align-items:center;gap:8px;color:var(--text);transition:.1s;
-}
+/* ══ CONTEXT MENU ══ */
+#ctx{position:fixed;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:5px;min-width:155px;box-shadow:var(--shadow);z-index:1000;display:none}
+.ci{padding:7px 11px;border-radius:6px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:7px;color:var(--text);transition:.1s}
 .ci:hover{background:var(--surface2)}
 .ci.red{color:var(--accent2)}
 .ci-sep{height:1px;background:var(--border);margin:4px 0}
 
-/* ══════════════════════════════════════════════
-   TOAST
-══════════════════════════════════════════════ */
-#toast{
-  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(16px);
-  background:var(--surface2);border:1px solid var(--border);color:var(--text);
-  padding:9px 18px;border-radius:9px;font-size:13px;z-index:9999;
-  opacity:0;transition:.3s;pointer-events:none;white-space:nowrap;
+/* ══ SHORTCUTS MODAL ══ */
+#shortcuts-modal{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:3000;display:none;align-items:center;justify-content:center}
+#shortcuts-modal.show{display:flex}
+#shortcuts-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;width:500px;max-height:80vh;overflow-y:auto;box-shadow:var(--shadow)}
+#shortcuts-card h3{font-size:16px;font-weight:500;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}
+#shortcuts-close{border:none;background:var(--surface2);border-radius:6px;padding:4px 10px;cursor:pointer;color:var(--text2);font-size:13px}
+#shortcuts-close:hover{background:var(--border)}
+.sc-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px}
+.sc-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)}
+.sc-label{font-size:13px;color:var(--text2)}
+.sc-keys{display:flex;gap:3px}
+.sc-key{background:var(--surface2);border:1px solid var(--border2);border-radius:5px;padding:2px 7px;font-size:11px;font-family:'DM Mono',monospace;color:var(--text)}
+.sc-section{font-size:11px;font-weight:500;color:var(--accent);text-transform:uppercase;letter-spacing:.6px;margin:14px 0 6px;grid-column:1/-1}
+
+/* ══ RENAME MODAL ══ */
+#rename-modal{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:3000;display:none;align-items:center;justify-content:center}
+#rename-modal.show{display:flex}
+#rename-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;width:300px;box-shadow:var(--shadow)}
+#rename-card h3{font-size:15px;font-weight:500;margin-bottom:14px}
+#rename-inp{width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;margin-bottom:12px;transition:.2s}
+#rename-inp:focus{border-color:var(--accent)}
+.rename-btns{display:flex;gap:8px}
+.rename-btns button{flex:1;padding:9px;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer}
+#rename-ok{background:var(--accent);color:#fff}
+#rename-ok:hover{background:#6a5ce8}
+#rename-cancel{background:var(--surface2);color:var(--text)}
+
+/* ══ PAGE SIZE MODAL ══ */
+#pagesize-modal{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:3000;display:none;align-items:center;justify-content:center}
+#pagesize-modal.show{display:flex}
+#pagesize-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;width:340px;box-shadow:var(--shadow)}
+#pagesize-card h3{font-size:15px;font-weight:500;margin-bottom:16px}
+.ps-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.ps-btn{
+  padding:10px 8px;border:2px solid var(--border);border-radius:10px;
+  cursor:pointer;background:var(--surface2);color:var(--text);
+  font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;
+  transition:.15s;text-align:center;
 }
+.ps-btn:hover{border-color:var(--accent);color:var(--accent)}
+.ps-btn.on{border-color:var(--accent);background:var(--adim);color:var(--accent)}
+.ps-orient{display:flex;gap:8px;margin-bottom:14px}
+.ps-orient button{flex:1;padding:8px;border:2px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text2);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;transition:.15s}
+.ps-orient button.on{border-color:var(--accent);color:var(--accent);background:var(--adim)}
+#ps-ok{width:100%;padding:11px;background:var(--accent);border:none;border-radius:9px;color:#fff;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer}
+#ps-ok:hover{background:#6a5ce8}
+
+/* ══ ZOOM INDICATOR ══ */
+#zoom-ind{position:absolute;bottom:14px;left:14px;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:3px 9px;font-size:11px;font-family:'DM Mono',monospace;color:var(--text2);pointer-events:none;opacity:0;transition:opacity .3s;z-index:100}
+#zoom-ind.show{opacity:1}
+
+/* ══ TOAST ══ */
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(14px);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 16px;border-radius:9px;font-size:13px;z-index:9999;opacity:0;transition:.3s;pointer-events:none;white-space:nowrap}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
-/* ══════════════════════════════════════════════
-   ZOOM INDICATOR
-══════════════════════════════════════════════ */
-#zoom-indicator{
-  position:absolute;bottom:16px;left:16px;background:var(--surface);
-  border:1px solid var(--border);border-radius:8px;padding:4px 10px;
-  font-size:11px;font-family:'DM Mono',monospace;color:var(--text2);
-  pointer-events:none;opacity:0;transition:opacity .3s;z-index:100;
-}
-#zoom-indicator.show{opacity:1}
-
-/* Scrollbar global */
-::-webkit-scrollbar{width:5px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 </style>
 </head>
 <body>
@@ -372,50 +304,46 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);use
     <div class="logo">✦ Whiteboard</div>
     <div class="logo-sub">Real-time collaborative canvas</div>
     <div class="tabs">
-      <button class="tab-btn on" onclick="ltab('create')">Yangi xona</button>
-      <button class="tab-btn" onclick="ltab('join')">Kirish</button>
+      <button class="tabbtn on" onclick="ltab('create')">Yangi xona</button>
+      <button class="tabbtn" onclick="ltab('join')">Kirish</button>
     </div>
-    <div id="lerr" class="err"></div>
-
+    <div id="lerr" class="lerr"></div>
     <div id="tp-create" class="tp on">
+      <div class="fg"><label>Ismingiz</label><input class="fi" id="l-name" placeholder="Alex, Sam..."/></div>
+      <div class="fg"><label>Xona nomi (ixtiyoriy)</label><input class="fi" id="l-rname" placeholder="Loyiha muhokamasi"/></div>
+      <div class="fg"><label>Parol (ixtiyoriy)</label><input class="fi" type="password" id="l-pwd" placeholder="Himoyalash uchun"/></div>
       <div class="fg">
-        <label>Ismingiz</label>
-        <input class="fi" id="create-name" placeholder="Alex, Sam..."/>
-      </div>
-      <div class="fg">
-        <label>Xona nomi (ixtiyoriy)</label>
-        <input class="fi" id="room-name" placeholder="Loyiha muhokamasi"/>
-      </div>
-      <div class="fg">
-        <label>Parol (ixtiyoriy)</label>
-        <input class="fi" type="password" id="create-pwd" placeholder="Himoyalash uchun"/>
+        <label>Varoq o'lchami</label>
+        <div class="fi-row">
+          <select class="fi" id="l-psize" style="cursor:pointer">
+            <option value="A4">A4 (210×297 mm)</option>
+            <option value="A3">A3 (297×420 mm)</option>
+            <option value="A5">A5 (148×210 mm)</option>
+            <option value="Letter">Letter (216×279 mm)</option>
+            <option value="Square">Square (250×250 mm)</option>
+          </select>
+          <select class="fi" id="l-orient" style="cursor:pointer;width:110px">
+            <option value="portrait">Vertikal</option>
+            <option value="landscape">Gorizontal</option>
+          </select>
+        </div>
       </div>
       <div class="fg">
         <label>Rasm max o'lchami (px)</label>
         <div class="fi-row">
-          <input class="fi" type="number" id="img-maxw" value="800" min="100" max="3000" placeholder="Kenglik"/>
-          <span style="color:var(--text2);display:flex;align-items:center;font-size:13px">×</span>
-          <input class="fi" type="number" id="img-maxh" value="600" min="100" max="3000" placeholder="Balandlik"/>
+          <input class="fi" type="number" id="l-imgw" value="800" min="100" max="3000"/>
+          <span>×</span>
+          <input class="fi" type="number" id="l-imgh" value="600" min="100" max="3000"/>
         </div>
       </div>
-      <button class="btn btn-p" onclick="createRoom()">Xona yaratish →</button>
+      <button class="fbtn fbtn-p" onclick="createRoom()">Xona yaratish →</button>
     </div>
-
     <div id="tp-join" class="tp">
-      <div class="fg">
-        <label>Ismingiz</label>
-        <input class="fi" id="join-name" placeholder="Alex, Sam..."/>
-      </div>
-      <div class="fg">
-        <label>Xona ID</label>
-        <input class="fi" id="join-id" placeholder="8 belgili ID" maxlength="8" style="font-family:'DM Mono',monospace;letter-spacing:2px"/>
-      </div>
-      <div class="fg" id="pwd-field" style="display:none">
-        <label>Parol</label>
-        <input class="fi" type="password" id="join-pwd" placeholder="Xona paroli"/>
-      </div>
-      <button class="btn btn-p" onclick="joinRoom()">Kirish →</button>
-      <button class="btn btn-s" onclick="checkRoom()">Tekshirish</button>
+      <div class="fg"><label>Ismingiz</label><input class="fi" id="l-jname" placeholder="Alex, Sam..."/></div>
+      <div class="fg"><label>Xona ID</label><input class="fi" id="l-jid" placeholder="8 belgili ID" maxlength="8" style="font-family:'DM Mono',monospace;letter-spacing:2px"/></div>
+      <div class="fg" id="pwd-field" style="display:none"><label>Parol</label><input class="fi" type="password" id="l-jpwd"/></div>
+      <button class="fbtn fbtn-p" onclick="joinRoom()">Kirish →</button>
+      <button class="fbtn fbtn-s" onclick="checkRoom()">Tekshirish</button>
     </div>
   </div>
 </div>
@@ -423,22 +351,23 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);use
 <!-- ══ APP ══ -->
 <div id="app">
   <div id="toolbar">
-    <!-- Chizish asboblari -->
+    <!-- Tools -->
     <div class="tg">
       <button class="tb on" id="tool-pen" data-tip="Qalam (P)" onclick="setTool('pen')">✏️</button>
       <button class="tb" id="tool-eraser" data-tip="O'chirg'ich (E)" onclick="setTool('eraser')">🧹</button>
       <button class="tb" id="tool-select" data-tip="Tanlash (S)" onclick="setTool('select')">↖</button>
+      <button class="tb" id="tool-ruler" data-tip="Chizg'ich (R)" onclick="toggleRuler()">📏</button>
     </div>
-    <!-- Shakllar -->
+    <!-- Shapes -->
     <div class="tg">
       <button class="tb" id="tool-line" data-tip="Chiziq (L)" onclick="setTool('line')">╱</button>
-      <button class="tb" id="tool-rect" data-tip="To'rtburchak (R)" onclick="setTool('rect')">▭</button>
-      <button class="tb" id="tool-circle" data-tip="Doira (C)" onclick="setTool('circle')">◯</button>
+      <button class="tb" id="tool-rect" data-tip="To'rtburchak" onclick="setTool('rect')">▭</button>
+      <button class="tb" id="tool-circle" data-tip="Doira" onclick="setTool('circle')">◯</button>
       <button class="tb" id="tool-triangle" data-tip="Uchburchak" onclick="setTool('triangle')">△</button>
       <button class="tb" id="tool-arrow" data-tip="O'q" onclick="setTool('arrow')">→</button>
       <button class="tb" id="tool-text" data-tip="Matn (T)" onclick="setTool('text')">T</button>
     </div>
-    <!-- Ranglar -->
+    <!-- Colors -->
     <div class="tg" style="gap:4px">
       <div class="csw on" style="background:#e2e2ee" onclick="setColor('#e2e2ee')"></div>
       <div class="csw" style="background:#7c6dfa" onclick="setColor('#7c6dfa')"></div>
@@ -448,81 +377,95 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);use
       <div class="csw" style="background:#38bdf8" onclick="setColor('#38bdf8')"></div>
       <div class="csw" style="background:#fb923c" onclick="setColor('#fb923c')"></div>
       <div class="csw" style="background:#f87171" onclick="setColor('#f87171')"></div>
-      <input type="color" id="color-custom" value="#ffffff" onchange="setColor(this.value)" title="Maxsus rang"/>
+      <input type="color" id="color-custom" value="#ffffff" onchange="setColor(this.value)"/>
     </div>
-    <!-- Qalinlik va shaffoflik -->
-    <div class="tg" style="gap:6px">
+    <!-- Style -->
+    <div class="tg" style="gap:5px">
       <button class="tb" id="fill-btn" data-tip="To'ldirish" onclick="toggleFill()">◈</button>
       <input class="rng" type="range" id="width-rng" min="1" max="40" value="3" oninput="setWidth(this.value)"/>
       <span class="rlbl" id="width-lbl">3</span>
       <div class="sep"></div>
       <input class="rng" type="range" id="opacity-rng" min="10" max="100" value="100" oninput="setOpacity(this.value)"/>
-      <span class="rlbl" id="opacity-lbl">100%</span>
+      <span class="rlbl" id="op-lbl">100%</span>
     </div>
     <!-- Zoom -->
     <div class="tg" style="gap:2px">
-      <button class="tb" data-tip="Kichraytirish (-)" onclick="zoom(-0.1)">−</button>
-      <span id="zoom-display" onclick="resetZoom()" data-tip="Reset">100%</span>
-      <button class="tb" data-tip="Kattalashtirish (+)" onclick="zoom(0.1)">+</button>
+      <button class="tb" data-tip="Kichraytirish (-)" onclick="doZoom(-0.1)">−</button>
+      <span id="zoom-disp" onclick="resetZoom()">100%</span>
+      <button class="tb" data-tip="Kattalashtirish (+)" onclick="doZoom(0.1)">+</button>
     </div>
-    <!-- Amallar -->
+    <!-- Actions -->
     <div class="tg">
       <button class="tb" data-tip="Orqaga (Ctrl+Z)" onclick="undo()">↩</button>
       <button class="tb" data-tip="Qaytarish (Ctrl+Y)" onclick="redo()">↪</button>
       <button class="tb" data-tip="Sticky note" onclick="addNote()">📌</button>
-      <button class="tb" data-tip="Rasm yuklash" onclick="document.getElementById('img-input').click()">🖼</button>
-      <input type="file" id="img-input" accept="image/*" style="display:none" onchange="loadImage(event)"/>
-      <button class="tb" data-tip="Reaktsiya" onclick="toggleReactionPicker()">🎉</button>
-      <div id="reaction-picker" style="display:none;position:absolute;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px;gap:6px;flex-wrap:wrap;width:160px;top:48px;z-index:500">
-        <span style="font-size:20px;cursor:pointer" onclick="sendReaction('👍')">👍</span>
-        <span style="font-size:20px;cursor:pointer" onclick="sendReaction('❤️')">❤️</span>
-        <span style="font-size:20px;cursor:pointer" onclick="sendReaction('🔥')">🔥</span>
-        <span style="font-size:20px;cursor:pointer" onclick="sendReaction('⭐')">⭐</span>
-        <span style="font-size:20px;cursor:pointer" onclick="sendReaction('😂')">😂</span>
-        <span style="font-size:20px;cursor:pointer" onclick="sendReaction('🎉')">🎉</span>
-        <span style="font-size:20px;cursor:pointer" onclick="sendReaction('💡')">💡</span>
-        <span style="font-size:20px;cursor:pointer" onclick="sendReaction('✅')">✅</span>
-      </div>
+      <button class="tb" data-tip="Jadval" onclick="addTable()">⊞</button>
+      <button class="tb" data-tip="Rasm yuklash" onclick="document.getElementById('img-inp').click()">🖼</button>
+      <input type="file" id="img-inp" accept="image/*" style="display:none" onchange="loadImg(event)"/>
+      <button class="tb" data-tip="Reaktsiya" onclick="toggleRPicker()" style="position:relative">🎉
+        <div id="rpicker">
+          <span onclick="sendReaction('👍')">👍</span><span onclick="sendReaction('❤️')">❤️</span>
+          <span onclick="sendReaction('🔥')">🔥</span><span onclick="sendReaction('⭐')">⭐</span>
+          <span onclick="sendReaction('😂')">😂</span><span onclick="sendReaction('🎉')">🎉</span>
+          <span onclick="sendReaction('💡')">💡</span><span onclick="sendReaction('✅')">✅</span>
+        </div>
+      </button>
     </div>
-    <!-- Eksport va boshqalar -->
+    <!-- Export -->
     <div class="tg">
-      <button class="tb" data-tip="PNG yuklash" onclick="exportPNG()">💾</button>
-      <button class="tb" data-tip="PDF yuklash" onclick="exportPDF()">📄</button>
+      <button class="tb" data-tip="Varoq sozlama" onclick="openPSModal()">📐</button>
+      <button class="tb" data-tip="PNG" onclick="exportPNG()">💾</button>
+      <button class="tb" data-tip="PDF (barcha varoqlar)" onclick="exportPDF()">📄</button>
+      <button class="tb" data-tip="Light/Dark" onclick="toggleTheme()">🌓</button>
+      <button class="tb" data-tip="To'liq ekran (F)" onclick="toggleFullscreen()">⛶</button>
+      <button class="tb" data-tip="Yordam (?)" onclick="showShortcuts()">?</button>
       <button class="tb" data-tip="Tozalash" onclick="clearAll()" style="color:var(--accent2)">🗑</button>
     </div>
-    <!-- Users + Chat -->
-    <div class="tg" style="gap:6px">
+    <!-- Users -->
+    <div class="tg" style="gap:5px">
       <div id="avatar-list" style="display:flex;align-items:center"></div>
       <div id="room-chip" onclick="copyLink()">📋 —</div>
       <button class="tb" id="chat-btn" data-tip="Chat" onclick="toggleChat()" style="position:relative">
-        💬
-        <div id="chat-badge"></div>
+        💬<div id="chat-badge"></div>
       </button>
     </div>
   </div>
 
-  <!-- Canvas -->
-  <div id="wrap">
-    <canvas id="main-canvas"></canvas>
-    <canvas id="overlay-canvas"></canvas>
-    <div id="cursors-layer"></div>
-    <div id="notes-layer"></div>
-    <div id="reactions-layer"></div>
-    <div id="selection-box"></div>
-    <div id="zoom-indicator">100%</div>
-
-    <!-- Chat panel -->
-    <div id="chat-panel">
-      <div id="chat-header">
-        <span id="chat-title">Chat</span>
-        <button id="chat-close" onclick="toggleChat()">✕</button>
+  <div id="main-area">
+    <!-- Pages sidebar -->
+    <div id="pages-sidebar">
+      <div id="pages-header">
+        <span id="pages-title">Varoqlar</span>
+        <button id="add-page-btn" onclick="addPage()" title="Varoq qo'shish">+</button>
       </div>
-      <div id="chat-msgs"></div>
-      <div id="chat-input-wrap">
-        <textarea id="chat-input" placeholder="Xabar yozing..." rows="1"></textarea>
-        <button id="chat-send" onclick="sendChat()">↑</button>
-      </div>
+      <div id="pages-list"></div>
     </div>
+
+    <!-- Canvas wrap -->
+    <div id="wrap">
+      <div id="canvas-inner">
+        <canvas id="main-canvas"></canvas>
+        <canvas id="overlay-canvas"></canvas>
+        <div id="cursors-layer"></div>
+        <div id="notes-layer"></div>
+        <div id="reactions-layer"></div>
+      </div>
+      <!-- Ruler overlays (shown when ruler active) -->
+      <div id="ruler-corner" style="display:none"></div>
+      <canvas id="ruler-h" style="display:none"></canvas>
+      <canvas id="ruler-v" style="display:none"></canvas>
+      <div id="zoom-ind"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Chat -->
+<div id="chat-panel">
+  <div id="chat-hdr"><span id="chat-title">Chat</span><button id="chat-close" onclick="toggleChat()">✕</button></div>
+  <div id="chat-msgs"></div>
+  <div id="chat-inp-wrap">
+    <textarea id="chat-inp" placeholder="Xabar..." rows="1"></textarea>
+    <button id="chat-send" onclick="sendChat()">↑</button>
   </div>
 </div>
 
@@ -531,22 +474,55 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);use
   <div class="ci" onclick="ctxUndo()">↩ Orqaga</div>
   <div class="ci" onclick="ctxRedo()">↪ Qaytarish</div>
   <div class="ci-sep"></div>
-  <div class="ci" id="ctx-front" onclick="bringFront()" style="display:none">⬆ Oldinga</div>
-  <div class="ci" id="ctx-back" onclick="sendBack()" style="display:none">⬇ Orqaga</div>
-  <div class="ci" id="ctx-del" onclick="deleteSelected()" style="display:none">✕ O'chirish</div>
+  <div class="ci" id="ctx-front" style="display:none" onclick="bringFront()">⬆ Oldinga</div>
+  <div class="ci" id="ctx-back" style="display:none" onclick="sendBack()">⬇ Orqaga</div>
+  <div class="ci" id="ctx-del" style="display:none" onclick="deleteSelected()">✕ O'chirish</div>
   <div class="ci-sep" id="ctx-sep2" style="display:none"></div>
   <div class="ci" onclick="addNote()">📌 Sticky note</div>
-  <div class="ci" onclick="exportPNG()">💾 PNG eksport</div>
-  <div class="ci" onclick="exportPDF()">📄 PDF eksport</div>
+  <div class="ci" onclick="addTable()">⊞ Jadval</div>
+  <div class="ci" onclick="exportPNG()">💾 PNG</div>
+  <div class="ci" onclick="exportPDF()">📄 PDF</div>
   <div class="ci-sep"></div>
-  <div class="ci red" onclick="clearAll()">🗑 Hammasini tozalash</div>
+  <div class="ci red" onclick="clearAll()">🗑 Tozalash</div>
+</div>
+
+<!-- Shortcuts modal -->
+<div id="shortcuts-modal">
+  <div id="shortcuts-card">
+    <h3>Keyboard shortcuts <button id="shortcuts-close" onclick="closeShortcuts()">Yopish</button></h3>
+    <div class="sc-grid">
+      <div class="sc-section">Asboblar</div>
+      <div class="sc-row"><span class="sc-label">Qalam</span><div class="sc-keys"><span class="sc-key">P</span></div></div>
+      <div class="sc-row"><span class="sc-label">O'chirg'ich</span><div class="sc-keys"><span class="sc-key">E</span></div></div>
+      <div class="sc-row"><span class="sc-label">Tanlash</span><div class="sc-keys"><span class="sc-key">S</span></div></div>
+      <div class="sc-row"><span class="sc-label">Chiziq</span><div class="sc-keys"><span class="sc-key">L</span></div></div>
+      <div class="sc-row"><span class="sc-label">Matn</span><div class="sc-keys"><span class="sc-key">T</span></div></div>
+      <div class="sc-row"><span class="sc-label">Chizg'ich</span><div class="sc-keys"><span class="sc-key">R</span></div></div>
+      <div class="sc-section">Amallar</div>
+      <div class="sc-row"><span class="sc-label">Orqaga</span><div class="sc-keys"><span class="sc-key">Ctrl</span><span class="sc-key">Z</span></div></div>
+      <div class="sc-row"><span class="sc-label">Qaytarish</span><div class="sc-keys"><span class="sc-key">Ctrl</span><span class="sc-key">Y</span></div></div>
+      <div class="sc-row"><span class="sc-label">O'chirish</span><div class="sc-keys"><span class="sc-key">Del</span></div></div>
+      <div class="sc-row"><span class="sc-label">Bekor</span><div class="sc-keys"><span class="sc-key">Esc</span></div></div>
+      <div class="sc-section">Ko'rinish</div>
+      <div class="sc-row"><span class="sc-label">Zoom +</span><div class="sc-keys"><span class="sc-key">+</span></div></div>
+      <div class="sc-row"><span class="sc-label">Zoom −</span><div class="sc-keys"><span class="sc-key">−</span></div></div>
+      <div class="sc-row"><span class="sc-label">Zoom reset</span><div class="sc-keys"><span class="sc-key">0</span></div></div>
+      <div class="sc-row"><span class="sc-label">To'liq ekran</span><div class="sc-keys"><span class="sc-key">F</span></div></div>
+      <div class="sc-row"><span class="sc-label">Pan (siljitish)</span><div class="sc-keys"><span class="sc-key">Space</span>+drag</div></div>
+      <div class="sc-row"><span class="sc-label">Yordam</span><div class="sc-keys"><span class="sc-key">?</span></div></div>
+      <div class="sc-section">Varoqlar</div>
+      <div class="sc-row"><span class="sc-label">Yangi varoq</span><div class="sc-keys"><span class="sc-key">Ctrl</span><span class="sc-key">Enter</span></div></div>
+      <div class="sc-row"><span class="sc-label">Keyingi varoq</span><div class="sc-keys"><span class="sc-key">Ctrl</span><span class="sc-key">→</span></div></div>
+      <div class="sc-row"><span class="sc-label">Oldingi varoq</span><div class="sc-keys"><span class="sc-key">Ctrl</span><span class="sc-key">←</span></div></div>
+    </div>
+  </div>
 </div>
 
 <!-- Rename modal -->
 <div id="rename-modal">
   <div id="rename-card">
     <h3>Ismingizni o'zgartiring</h3>
-    <input id="rename-input" class="fi" placeholder="Yangi ism" maxlength="30"/>
+    <input id="rename-inp" placeholder="Yangi ism" maxlength="30"/>
     <div class="rename-btns">
       <button id="rename-cancel" onclick="closeRename()">Bekor</button>
       <button id="rename-ok" onclick="confirmRename()">Saqlash</button>
@@ -554,33 +530,63 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);use
   </div>
 </div>
 
+<!-- Page size modal -->
+<div id="pagesize-modal">
+  <div id="pagesize-card">
+    <h3>Varoq o'lchami</h3>
+    <div class="ps-grid">
+      <button class="ps-btn on" data-size="A4" onclick="selectPS(this)">A4<br><small style="font-size:10px;opacity:.6">210×297 mm</small></button>
+      <button class="ps-btn" data-size="A3" onclick="selectPS(this)">A3<br><small style="font-size:10px;opacity:.6">297×420 mm</small></button>
+      <button class="ps-btn" data-size="A5" onclick="selectPS(this)">A5<br><small style="font-size:10px;opacity:.6">148×210 mm</small></button>
+      <button class="ps-btn" data-size="Letter" onclick="selectPS(this)">Letter<br><small style="font-size:10px;opacity:.6">216×279 mm</small></button>
+      <button class="ps-btn" data-size="Square" onclick="selectPS(this)">Square<br><small style="font-size:10px;opacity:.6">250×250 mm</small></button>
+    </div>
+    <div class="ps-orient">
+      <button class="on" id="ps-portrait" onclick="selectOrient('portrait',this)">↕ Vertikal</button>
+      <button id="ps-landscape" onclick="selectOrient('landscape',this)">↔ Gorizontal</button>
+    </div>
+    <button id="ps-ok" onclick="applyPS()">Qo'llash</button>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
-// ════════════════════════════════════════════════════
-// CONFIG
-// ════════════════════════════════════════════════════
+// ════ CONFIG ════
 const SERVER_URL = 'https://whiteboard-backend-jeh6.onrender.com';
 
-// ════════════════════════════════════════════════════
-// STATE
-// ════════════════════════════════════════════════════
+// ════ PAPER SIZES (px @ 96dpi) ════
+const PAPER_SIZES = {
+  A4:     { w: 794,  h: 1123 },
+  A3:     { w: 1123, h: 1587 },
+  A5:     { w: 559,  h: 794  },
+  Letter: { w: 816,  h: 1056 },
+  Square: { w: 945,  h: 945  },
+};
+
+// ════ STATE ════
 let socket = null;
 let roomId = null;
-let me = null; // { userId, name, color }
+let me = null;
 let tool = 'pen';
-let color = '#e2e2ee';
+let penColor = '#e2e2ee';
 let strokeW = 3;
 let opacity = 1;
 let fillOn = false;
 let imgMaxW = 800, imgMaxH = 600;
 
+// Pages
+let pages = []; // { id, strokes[], paperSize, orient }
+let currentPageIdx = 0;
+let pendingPS = { size: 'A4', orient: 'portrait' };
+
+// Current page strokes shortcut
+function curPage() { return pages[currentPageIdx]; }
+function curStrokes() { return curPage()?.strokes || []; }
+
 // Zoom & Pan
-let scale = 1;
-let panX = 0, panY = 0;
-let isPanning = false;
-let spaceDown = false;
-let panStart = null;
+let scale = 1, panX = 0, panY = 0;
+let isPanning = false, spaceDown = false, panStart = null;
 
 // Drawing
 let drawing = false;
@@ -588,115 +594,104 @@ let strokeId = null;
 let pts = [];
 let sx = 0, sy = 0;
 
-// Strokes storage
-let strokes = []; // { id, tool, pts, shape, color, w, opacity, fill, fontSize, text, imgData, zIdx, userId }
-let undoStack = []; // strokeId array for redo
-let remoteDrawing = {}; // userId -> {color,w,opacity,pts}
+// Ruler
+let rulerOn = false;
 
-// Selection
-let selectedId = null;
-let isDraggingStroke = false;
-let dragStrokeStart = null;
-let dragStrokeOrigin = null;
+// Undo/Redo
+let undoStack = [];
 
-// Image resize
-let resizingImg = null; // { strokeId, handle, startX, startY, origW, origH, origX, origY }
-
-// Chat
-let chatOpen = false;
-let unreadCount = 0;
-let chatHistory = [];
-
-// Cursors
+// Remote
+let remoteDrawing = {};
 const remoteCursors = {};
 const onlineUsers = {};
 
-// Text input
+// Selection
+let selectedId = null;
+let isDragging = false;
+let dragStart = null, dragOrigin = null;
+
+// Chat
+let chatOpen = false, unreadCount = 0;
+
+// Text
 let textEl = null;
 
-// Context menu target
-let ctxTarget = null;
-
-// Canvas refs
+// Canvas
 const mainC = document.getElementById('main-canvas');
 const overlayC = document.getElementById('overlay-canvas');
 const ctx = mainC.getContext('2d');
 const octx = overlayC.getContext('2d');
 
-// ════════════════════════════════════════════════════
-// CANVAS RESIZE
-// ════════════════════════════════════════════════════
+// ════ INIT ════
+function initFirstPage(size='A4', orient='portrait') {
+  pages = [{ id: crypto.randomUUID(), strokes: [], paperSize: size, orient }];
+  currentPageIdx = 0;
+  renderPageThumbs();
+}
+
+// ════ RESIZE ════
 function resizeCanvas() {
-  const wrap = document.getElementById('wrap');
+  const wrap = document.getElementById('canvas-inner');
   if (!wrap) return;
   const w = wrap.clientWidth, h = wrap.clientHeight;
-  if (!w || !h) return;
+  if (!w||!h) return;
   mainC.width = w; mainC.height = h;
   overlayC.width = w; overlayC.height = h;
+  if (rulerOn) drawRulers();
   redraw();
 }
 window.addEventListener('resize', resizeCanvas);
 
-// ════════════════════════════════════════════════════
-// LOBBY
-// ════════════════════════════════════════════════════
+// ════ LOBBY ════
 function ltab(t) {
-  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('on', (i===0&&t==='create')||(i===1&&t==='join')));
-  document.getElementById('tp-create').classList.toggle('on', t==='create');
-  document.getElementById('tp-join').classList.toggle('on', t==='join');
-  hideErr();
+  document.querySelectorAll('.tabbtn').forEach((b,i) => b.classList.toggle('on',(i===0&&t==='create')||(i===1&&t==='join')));
+  document.getElementById('tp-create').classList.toggle('on',t==='create');
+  document.getElementById('tp-join').classList.toggle('on',t==='join');
+  document.getElementById('lerr').style.display='none';
 }
-function showErr(m) { const e = document.getElementById('lerr'); e.textContent = m; e.style.display = 'block'; }
-function hideErr() { document.getElementById('lerr').style.display = 'none'; }
+function showErr(m){const e=document.getElementById('lerr');e.textContent=m;e.style.display='block'}
 
 async function createRoom() {
-  const name = document.getElementById('create-name').value.trim();
-  const rname = document.getElementById('room-name').value;
-  const pwd = document.getElementById('create-pwd').value;
-  imgMaxW = parseInt(document.getElementById('img-maxw').value) || 800;
-  imgMaxH = parseInt(document.getElementById('img-maxh').value) || 600;
+  const name = document.getElementById('l-name').value.trim();
+  const rname = document.getElementById('l-rname').value;
+  const pwd = document.getElementById('l-pwd').value;
+  const size = document.getElementById('l-psize').value;
+  const orient = document.getElementById('l-orient').value;
+  imgMaxW = parseInt(document.getElementById('l-imgw').value)||800;
+  imgMaxH = parseInt(document.getElementById('l-imgh').value)||600;
   try {
-    const res = await fetch(`${SERVER_URL}/api/rooms`, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ name: rname, password: pwd }),
-    });
+    const res = await fetch(`${SERVER_URL}/api/rooms`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:rname,password:pwd})});
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
+    if(!res.ok) throw new Error(data.error);
+    initFirstPage(size, orient);
     enterRoom(data.roomId, name);
-  } catch(e) { showErr(e.message || 'Xona yaratib bo\'lmadi'); }
+  } catch(e){showErr(e.message||'Xona yaratib bo\'lmadi')}
 }
 
 async function checkRoom() {
-  const id = document.getElementById('join-id').value.trim().toLowerCase();
-  if (!id) return showErr('Xona ID kiriting');
+  const id = document.getElementById('l-jid').value.trim().toLowerCase();
+  if(!id) return showErr('Xona ID kiriting');
   try {
-    const res = await fetch(`${SERVER_URL}/api/rooms/${id}/join`, {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({}),
-    });
+    const res = await fetch(`${SERVER_URL}/api/rooms/${id}/join`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
     const data = await res.json();
-    if (res.status === 404) return showErr('Bunday xona mavjud emas');
-    if (data.needsPassword) {
-      document.getElementById('pwd-field').style.display = 'block';
-      showErr('Bu xona himoyalangan — parol kiriting');
-      return;
-    }
-    if (res.ok) enterRoom(id, document.getElementById('join-name').value.trim());
-  } catch(e) { showErr('Server bilan aloqa yo\'q'); }
+    if(res.status===404) return showErr('Bunday xona mavjud emas');
+    if(data.needsPassword){document.getElementById('pwd-field').style.display='block';showErr('Parol kiriting');return}
+    if(res.ok){initFirstPage();enterRoom(id,document.getElementById('l-jname').value.trim())}
+  } catch(e){showErr('Server bilan aloqa yo\'q')}
 }
 
 async function joinRoom() {
-  const id = document.getElementById('join-id').value.trim().toLowerCase();
-  const pwd = document.getElementById('join-pwd').value;
-  const name = document.getElementById('join-name').value.trim();
-  if (!id) return showErr('Xona ID kiriting');
+  const id = document.getElementById('l-jid').value.trim().toLowerCase();
+  const pwd = document.getElementById('l-jpwd').value;
+  const name = document.getElementById('l-jname').value.trim();
+  if(!id) return showErr('Xona ID kiriting');
   try {
-    const res = await fetch(`${SERVER_URL}/api/rooms/${id}/join`, {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ password: pwd }),
-    });
+    const res = await fetch(`${SERVER_URL}/api/rooms/${id}/join`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pwd})});
     const data = await res.json();
-    if (!res.ok) return showErr(data.error || 'Kira olmadingiz');
-    enterRoom(id, name);
-  } catch(e) { showErr('Server bilan aloqa yo\'q'); }
+    if(!res.ok) return showErr(data.error||'Kira olmadingiz');
+    initFirstPage();
+    enterRoom(id,name);
+  } catch(e){showErr('Server bilan aloqa yo\'q')}
 }
 
 function enterRoom(id, preferredName) {
@@ -704,1033 +699,817 @@ function enterRoom(id, preferredName) {
   document.getElementById('lobby').classList.add('out');
   document.getElementById('app').classList.add('on');
   document.getElementById('room-chip').textContent = `📋 ${id}`;
-
-  requestAnimationFrame(() => requestAnimationFrame(() => {
+  // Center paper on load
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
     resizeCanvas();
+    centerPaper();
     connectSocket(id, preferredName);
     loadData(id);
-    overlayC.style.pointerEvents = 'auto';
+    overlayC.style.pointerEvents='auto';
   }));
-
-  const url = new URL(location.href);
-  url.searchParams.set('room', id);
-  history.pushState({}, '', url);
+  const url=new URL(location.href);url.searchParams.set('room',id);history.pushState({},'',url);
 }
 
-window.addEventListener('load', () => {
-  const id = new URLSearchParams(location.search).get('room');
-  if (id) { document.getElementById('join-id').value = id; ltab('join'); checkRoom(); }
+window.addEventListener('load',()=>{
+  const id=new URLSearchParams(location.search).get('room');
+  if(id){document.getElementById('l-jid').value=id;ltab('join');checkRoom()}
 });
 
-// ════════════════════════════════════════════════════
-// SOCKET
-// ════════════════════════════════════════════════════
+// Center paper in viewport
+function centerPaper() {
+  const pg = curPage();
+  if(!pg) return;
+  const pd = paperDims(pg);
+  const w = mainC.width, h = mainC.height;
+  panX = (w - pd.w * scale) / 2;
+  panY = (h - pd.h * scale) / 2;
+  redraw();
+}
+
+function paperDims(page) {
+  const base = PAPER_SIZES[page.paperSize||'A4']||PAPER_SIZES.A4;
+  return page.orient==='landscape' ? {w:base.h,h:base.w} : {w:base.w,h:base.h};
+}
+
+// ════ SOCKET ════
 function connectSocket(id, preferredName) {
-  socket = io(SERVER_URL);
-  const userId = localStorage.getItem('wb-uid') || crypto.randomUUID();
-  localStorage.setItem('wb-uid', userId);
-  const savedName = preferredName || localStorage.getItem('wb-name') || '';
-
-  socket.on('connect', () => {
-    socket.emit('join-room', { roomId: id, userId, preferredName: savedName });
-  });
-
-  socket.on('joined', ({ user, onlineUsers: users }) => {
-    me = user;
-    if (user.name) localStorage.setItem('wb-name', user.name);
-    users.forEach(addAvatar);
-  });
-
-  socket.on('user-joined', (u) => { addAvatar(u); toast(`${u.name} qo'shildi`); });
-  socket.on('user-left', (u) => { removeAvatar(u.userId); removeCursor(u.userId); toast(`${u.name} chiqdi`); });
-  socket.on('user-renamed', ({ userId, name }) => {
-    if (onlineUsers[userId]) { onlineUsers[userId].name = name; updateAvatarTip(userId, name); }
-    if (remoteCursors[userId]) remoteCursors[userId].querySelector('.rcursor-label').textContent = name;
-  });
-
-  // Remote drawing
-  socket.on('stroke-start', ({ userId, color: c, w, opacity: op, fill }) => {
-    remoteDrawing[userId] = { color: c, w, opacity: op, fill, pts: [] };
-  });
-  socket.on('stroke-point', ({ userId, x, y }) => {
-    if (!remoteDrawing[userId]) return;
-    remoteDrawing[userId].pts.push({ x, y });
-    drawOverlay();
-  });
-  socket.on('stroke-end', (data) => {
-    delete remoteDrawing[data.userId];
-    strokes.push(parseStroke(data));
-    strokes.sort((a,b) => (a.zIdx||0)-(b.zIdx||0));
-    redraw();
-  });
-  socket.on('stroke-removed', ({ strokeId: sid }) => {
-    strokes = strokes.filter(s => s.id !== sid);
-    if (selectedId === sid) selectedId = null;
-    redraw();
-  });
-  socket.on('stroke-move', (data) => {
-    const s = strokes.find(s => s.id === data.strokeId);
-    if (s) { s.pts = data.newPoints || []; s.shape = data.newShapeData; redraw(); }
-  });
-  socket.on('stroke-zindex', ({ strokeId: sid, zIndex }) => {
-    const s = strokes.find(s => s.id === sid);
-    if (s) { s.zIdx = zIndex; strokes.sort((a,b) => (a.zIdx||0)-(b.zIdx||0)); redraw(); }
-  });
-  socket.on('board-cleared', () => { strokes = []; selectedId = null; redraw(); });
-  socket.on('image-add', (data) => {
-    strokes.push({ id: data.strokeId, tool:'image', shape:{x:data.x,y:data.y,width:data.width,height:data.height}, imgData:data.imageData, zIdx:data.zIndex||0 });
-    strokes.sort((a,b) => (a.zIdx||0)-(b.zIdx||0));
-    redraw();
-  });
-  socket.on('image-resize', (data) => {
-    const s = strokes.find(s => s.id === data.strokeId);
-    if (s) { s.shape = { x:data.x, y:data.y, width:data.width, height:data.height }; redraw(); }
-  });
-  socket.on('note-add', d => createNoteEl(d.noteId, d.x, d.y, d.content, d.bgColor));
-  socket.on('note-update', d => { const el = document.querySelector(`[data-nid="${d.noteId}"] textarea`); if(el) el.value = d.content; });
-  socket.on('note-delete', ({ noteId }) => { const el = document.querySelector(`[data-nid="${noteId}"]`); if(el) el.remove(); });
-  socket.on('chat-message', appendMsg);
-  socket.on('reaction', d => showReaction(d.x, d.y, d.emoji));
-  socket.on('cursor-move', d => updateCursor(d));
-  socket.on('error', ({ message }) => toast('⚠️ ' + message));
+  socket=io(SERVER_URL);
+  const userId=localStorage.getItem('wb-uid')||crypto.randomUUID();
+  localStorage.setItem('wb-uid',userId);
+  const savedName=preferredName||localStorage.getItem('wb-name')||'';
+  socket.on('connect',()=>socket.emit('join-room',{roomId:id,userId,preferredName:savedName}));
+  socket.on('joined',({user,onlineUsers:users})=>{me=user;if(user.name)localStorage.setItem('wb-name',user.name);users.forEach(addAvatar)});
+  socket.on('user-joined',u=>{addAvatar(u);toast(`${u.name} qo'shildi`)});
+  socket.on('user-left',u=>{removeAvatar(u.userId);removeCursor(u.userId);toast(`${u.name} chiqdi`)});
+  socket.on('user-renamed',({userId,name})=>{if(onlineUsers[userId])onlineUsers[userId].name=name;const el=document.querySelector(`[data-uid="${userId}"]`);if(el)el.title=name});
+  socket.on('stroke-start',({userId,color:c,w,opacity:op,fill})=>{remoteDrawing[userId]={color:c,w,opacity:op,fill,pts:[]}});
+  socket.on('stroke-point',({userId,x,y})=>{if(!remoteDrawing[userId])return;remoteDrawing[userId].pts.push({x,y});drawOverlay()});
+  socket.on('stroke-end',data=>{delete remoteDrawing[data.userId];const s=parseStroke(data);curPage().strokes.push(s);curPage().strokes.sort((a,b)=>(a.zIdx||0)-(b.zIdx||0));redraw();updateThumb(currentPageIdx)});
+  socket.on('stroke-removed',({strokeId:sid})=>{if(curPage())curPage().strokes=curPage().strokes.filter(s=>s.id!==sid);if(selectedId===sid)selectedId=null;redraw();updateThumb(currentPageIdx)});
+  socket.on('stroke-move',data=>{const s=curPage()?.strokes.find(s=>s.id===data.strokeId);if(s){s.pts=data.newPoints||[];s.shape=data.newShapeData}redraw()});
+  socket.on('stroke-zindex',({strokeId:sid,zIndex})=>{const s=curPage()?.strokes.find(s=>s.id===sid);if(s){s.zIdx=zIndex;curPage().strokes.sort((a,b)=>(a.zIdx||0)-(b.zIdx||0))}redraw()});
+  socket.on('board-cleared',()=>{if(curPage())curPage().strokes=[];selectedId=null;redraw();updateThumb(currentPageIdx)});
+  socket.on('image-add',data=>{curPage()?.strokes.push({id:data.strokeId,tool:'image',shape:{x:data.x,y:data.y,width:data.width,height:data.height},imgData:data.imageData,zIdx:data.zIndex||0});curPage()?.strokes.sort((a,b)=>(a.zIdx||0)-(b.zIdx||0));redraw()});
+  socket.on('note-add',d=>createNoteEl(d.noteId,d.x,d.y,d.content,d.bgColor));
+  socket.on('note-update',d=>{const el=document.querySelector(`[data-nid="${d.noteId}"] textarea`);if(el)el.value=d.content});
+  socket.on('note-delete',({noteId})=>{const el=document.querySelector(`[data-nid="${noteId}"]`);if(el)el.remove()});
+  socket.on('chat-message',m=>appendMsg(m));
+  socket.on('reaction',d=>showReaction(d.x,d.y,d.emoji));
+  socket.on('cursor-move',d=>updateCursor(d));
+  socket.on('error',({message})=>toast('⚠️ '+message));
 }
 
 function parseStroke(d) {
   return {
-    id: d.strokeId || d.id, tool: d.tool,
-    pts: d.points || d.pts || [],
-    shape: d.shapeData || d.shape_data || d.shape,
-    color: d.color, w: d.width || d.w,
-    opacity: d.opacity, fill: d.fillColor || d.fill_color || d.fill,
-    fontSize: d.fontSize || d.font_size,
-    text: d.textContent || d.text_content || d.text,
-    imgData: d.imageData || d.image_data || d.imgData,
-    zIdx: d.zIndex || d.z_index || d.zIdx || 0,
-    userId: d.userId || d.user_id,
+    id:d.strokeId||d.id,tool:d.tool,
+    pts:d.points||d.pts||[],
+    shape:d.shapeData||d.shape_data||d.shape,
+    color:d.color,w:d.width||d.w,
+    opacity:d.opacity,fill:d.fillColor||d.fill_color||d.fill,
+    fontSize:d.fontSize||d.font_size,
+    text:d.textContent||d.text_content||d.text,
+    imgData:d.imageData||d.image_data||d.imgData,
+    zIdx:d.zIndex||d.z_index||d.zIdx||0,
+    userId:d.userId||d.user_id,
   };
 }
 
 async function loadData(id) {
   try {
-    const res = await fetch(`${SERVER_URL}/api/rooms/${id}/data`);
-    const data = await res.json();
-    strokes = data.strokes.map(s => parseStroke({
-      ...s, strokeId: s.id, points: s.points, shapeData: s.shape_data,
-      fillColor: s.fill_color, fontSize: s.font_size, textContent: s.text_content,
-      imageData: s.image_data, zIndex: s.z_index,
-    }));
-    strokes.sort((a,b) => (a.zIdx||0)-(b.zIdx||0));
-    data.notes.forEach(n => createNoteEl(n.id, n.x, n.y, n.content, n.bg_color));
-    chatHistory = data.chat || [];
-    chatHistory.forEach(m => appendMsg(m, false));
+    const res=await fetch(`${SERVER_URL}/api/rooms/${id}/data`);
+    const data=await res.json();
+    if(curPage()) curPage().strokes=data.strokes.map(s=>parseStroke({...s,strokeId:s.id,points:s.points,shapeData:s.shape_data,fillColor:s.fill_color,fontSize:s.font_size,textContent:s.text_content,imageData:s.image_data,zIndex:s.z_index}));
+    curPage()?.strokes.sort((a,b)=>(a.zIdx||0)-(b.zIdx||0));
+    data.notes?.forEach(n=>createNoteEl(n.id,n.x,n.y,n.content,n.bg_color));
+    data.chat?.forEach(m=>appendMsg(m,false));
     redraw();
-  } catch(e) { console.error('Load error:', e); }
+    updateThumb(0);
+  } catch(e){console.error('Load error:',e)}
 }
 
-// ════════════════════════════════════════════════════
-// TOOLS
-// ════════════════════════════════════════════════════
-function setTool(t) {
-  tool = t;
-  document.querySelectorAll('.tb[id^="tool-"]').forEach(b => b.classList.remove('on'));
-  const btn = document.getElementById(`tool-${t}`);
-  if (btn) btn.classList.add('on');
-  if (t !== 'select') { selectedId = null; redraw(); }
-  overlayC.style.cursor = t==='eraser' ? 'cell' : t==='text' ? 'text' : t==='select' ? 'default' : 'crosshair';
+// ════ PAGES ════
+function addPage() {
+  const pg=curPage();
+  pages.push({id:crypto.randomUUID(),strokes:[],paperSize:pg?.paperSize||'A4',orient:pg?.orient||'portrait'});
+  switchPage(pages.length-1);
 }
 
-function setColor(c) {
-  color = c;
-  document.querySelectorAll('.csw').forEach(s => s.classList.remove('on'));
-  document.querySelectorAll('.csw').forEach(s => { if(s.style.background===c) s.classList.add('on'); });
+function switchPage(idx) {
+  currentPageIdx=idx;
+  selectedId=null;
+  panX=0;panY=0;
+  resizeCanvas();
+  centerPaper();
+  renderPageThumbs();
+  toast(`Varoq ${idx+1}`);
 }
 
-function setWidth(v) { strokeW = parseInt(v); document.getElementById('width-lbl').textContent = v; }
-function setOpacity(v) { opacity = parseInt(v)/100; document.getElementById('opacity-lbl').textContent = v+'%'; }
-function toggleFill() { fillOn = !fillOn; document.getElementById('fill-btn').classList.toggle('on', fillOn); }
-
-// ════════════════════════════════════════════════════
-// ZOOM & PAN
-// ════════════════════════════════════════════════════
-function zoom(delta, cx, cy) {
-  const wrap = document.getElementById('wrap');
-  const mx = cx ?? wrap.clientWidth/2;
-  const my = cy ?? wrap.clientHeight/2;
-  const newScale = Math.min(Math.max(scale + delta, 0.1), 10);
-  panX = mx - (mx - panX) * (newScale / scale);
-  panY = my - (my - panY) * (newScale / scale);
-  scale = newScale;
-  updateZoomDisplay();
-  redraw();
+function deletePage(idx) {
+  if(pages.length<=1){toast('Kamida 1 varoq bo\'lishi kerak!');return}
+  if(!confirm(`${idx+1}-varoqni o'chirasizmi?`)) return;
+  pages.splice(idx,1);
+  if(currentPageIdx>=pages.length) currentPageIdx=pages.length-1;
+  renderPageThumbs();
+  resizeCanvas();
+  centerPaper();
 }
 
-function resetZoom() { scale = 1; panX = 0; panY = 0; updateZoomDisplay(); redraw(); }
+function renderPageThumbs() {
+  const list=document.getElementById('pages-list');
+  list.innerHTML='';
+  pages.forEach((pg,i)=>{
+    const thumb=document.createElement('div');
+    thumb.className='page-thumb'+(i===currentPageIdx?' active':'');
+    const pd=paperDims(pg);
+    const tw=100,th=Math.round(tw*(pd.h/pd.w));
+    const tc=document.createElement('canvas');
+    tc.width=tw;tc.height=th;
+    thumb.appendChild(tc);
+    // Draw thumbnail
+    const tctx=tc.getContext('2d');
+    const isLight=document.documentElement.classList.contains('light');
+    tctx.fillStyle=isLight?'#fff':'#1c1c28';
+    tctx.fillRect(0,0,tw,th);
+    const sc=tw/pd.w;
+    tctx.save();tctx.scale(sc,sc);
+    pg.strokes.forEach(s=>drawStroke(tctx,s));
+    tctx.restore();
 
-function updateZoomDisplay() {
-  const pct = Math.round(scale * 100) + '%';
-  document.getElementById('zoom-display').textContent = pct;
-  const ind = document.getElementById('zoom-indicator');
-  ind.textContent = pct;
-  ind.classList.add('show');
-  clearTimeout(ind._t);
-  ind._t = setTimeout(() => ind.classList.remove('show'), 1200);
-}
+    const lbl=document.createElement('div');
+    lbl.className='page-thumb-label';
+    lbl.textContent=`${i+1}`;
+    thumb.appendChild(lbl);
 
-// Canvas koordinatalarini world ga o'tkazish
-function toWorld(ex, ey) {
-  const rect = overlayC.getBoundingClientRect();
-  const sx2 = overlayC.width / rect.width;
-  const sy2 = overlayC.height / rect.height;
-  return {
-    x: ((ex - rect.left) * sx2 - panX) / scale,
-    y: ((ey - rect.top) * sy2 - panY) / scale,
-  };
-}
-
-// ════════════════════════════════════════════════════
-// CANVAS EVENTS
-// ════════════════════════════════════════════════════
-overlayC.addEventListener('mousedown', onDown);
-overlayC.addEventListener('mousemove', onMove);
-overlayC.addEventListener('mouseup', onUp);
-overlayC.addEventListener('mouseleave', onUp);
-overlayC.addEventListener('wheel', onWheel, { passive: false });
-overlayC.addEventListener('contextmenu', onCtx);
-overlayC.addEventListener('touchstart', e => { e.preventDefault(); onDown(e.touches[0]); }, { passive: false });
-overlayC.addEventListener('touchmove', e => { e.preventDefault(); onMove(e.touches[0]); }, { passive: false });
-overlayC.addEventListener('touchend', e => { e.preventDefault(); onUp(e.changedTouches[0]); }, { passive: false });
-
-document.addEventListener('keydown', onKey);
-document.addEventListener('keyup', e => { if(e.key===' ') { spaceDown=false; overlayC.style.cursor='crosshair'; } });
-
-function onWheel(e) {
-  e.preventDefault();
-  const delta = e.deltaY > 0 ? -0.08 : 0.08;
-  zoom(delta, e.clientX, e.clientY);
-}
-
-function onKey(e) {
-  if (!roomId) return;
-  if (e.key === ' ' && !e.target.matches('input,textarea')) { e.preventDefault(); spaceDown = true; overlayC.style.cursor = 'grab'; }
-  if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undo(); }
-  if (e.ctrlKey && e.key === 'y') { e.preventDefault(); redo(); }
-  if (e.key === 'Escape') { if(textEl){textEl.remove();textEl=null;} selectedId=null; redraw(); }
-  if (e.key === 'Delete' || e.key === 'Backspace') {
-    if(e.target.matches('input,textarea')) return;
-    if(selectedId) deleteSelected();
-  }
-  const map = { p:'pen', e:'eraser', s:'select', l:'line', r:'rect', c:'circle', t:'text' };
-  if (!e.ctrlKey && !e.altKey && !e.target.matches('input,textarea') && map[e.key]) setTool(map[e.key]);
-  if (e.key==='+' || e.key==='=') zoom(0.1);
-  if (e.key==='-') zoom(-0.1);
-}
-
-function onDown(e) {
-  const world = toWorld(e.clientX, e.clientY);
-
-  // Space + drag = pan
-  if (spaceDown || e.button === 1) {
-    isPanning = true;
-    panStart = { mx: e.clientX, my: e.clientY, px: panX, py: panY };
-    overlayC.style.cursor = 'grabbing';
-    return;
-  }
-
-  hideCtx();
-
-  if (tool === 'text') { placeText(world); return; }
-
-  if (tool === 'select') {
-    // Stroke tanlash
-    const hit = hitTest(world.x, world.y);
-    if (hit) {
-      selectedId = hit.id;
-      isDraggingStroke = true;
-      dragStrokeStart = { x: world.x, y: world.y };
-      dragStrokeOrigin = JSON.parse(JSON.stringify(hit));
-      redraw();
-      return;
-    } else {
-      selectedId = null;
-      redraw();
+    if(pages.length>1){
+      const del=document.createElement('button');
+      del.className='page-del-btn';del.textContent='×';
+      del.onclick=e=>{e.stopPropagation();deletePage(i)};
+      thumb.appendChild(del);
     }
-    return;
-  }
 
-  drawing = true;
-  sx = world.x; sy = world.y;
-  pts = [{ x: world.x, y: world.y }];
-  strokeId = crypto.randomUUID();
-
-  socket?.emit('stroke-start', {
-    tool, color, w: strokeW, opacity, fill: fillOn ? color : null, strokeId,
+    thumb.onclick=()=>switchPage(i);
+    list.appendChild(thumb);
   });
 }
 
-function onMove(e) {
-  const world = toWorld(e.clientX, e.clientY);
+function updateThumb(idx) {
+  setTimeout(()=>{
+    const thumbs=document.querySelectorAll('.page-thumb');
+    const thumb=thumbs[idx];
+    if(!thumb) return;
+    const tc=thumb.querySelector('canvas');
+    if(!tc) return;
+    const pg=pages[idx];
+    if(!pg) return;
+    const pd=paperDims(pg);
+    const tw=100,th=Math.round(tw*(pd.h/pd.w));
+    tc.width=tw;tc.height=th;
+    const tctx=tc.getContext('2d');
+    const isLight=document.documentElement.classList.contains('light');
+    tctx.fillStyle=isLight?'#fff':'#1c1c28';
+    tctx.fillRect(0,0,tw,th);
+    const sc=tw/pd.w;
+    tctx.save();tctx.scale(sc,sc);
+    pg.strokes.forEach(s=>drawStroke(tctx,s));
+    tctx.restore();
+  },100);
+}
 
-  // Cursor broadcast
-  socket?.emit('cursor-move', { x: world.x, y: world.y });
+// ════ PAGE SIZE MODAL ════
+function openPSModal() {
+  const pg=curPage();
+  document.querySelectorAll('.ps-btn').forEach(b=>b.classList.toggle('on',b.dataset.size===(pg?.paperSize||'A4')));
+  selectOrient(pg?.orient||'portrait', document.getElementById('ps-portrait'));
+  document.getElementById('pagesize-modal').classList.add('show');
+}
 
-  // Panning
-  if (isPanning && panStart) {
-    panX = panStart.px + (e.clientX - panStart.mx);
-    panY = panStart.py + (e.clientY - panStart.my);
-    redraw();
-    return;
+function selectPS(btn) {
+  document.querySelectorAll('.ps-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  pendingPS.size=btn.dataset.size;
+}
+
+function selectOrient(o, btn) {
+  pendingPS.orient=o;
+  document.getElementById('ps-portrait').classList.toggle('on',o==='portrait');
+  document.getElementById('ps-landscape').classList.toggle('on',o==='landscape');
+}
+
+function applyPS() {
+  const pg=curPage();
+  if(!pg) return;
+  const active=document.querySelector('.ps-btn.on');
+  pg.paperSize=active?.dataset.size||'A4';
+  pg.orient=pendingPS.orient||'portrait';
+  document.getElementById('pagesize-modal').classList.remove('show');
+  centerPaper();
+  redraw();
+  renderPageThumbs();
+  toast(`${pg.paperSize} ${pg.orient==='landscape'?'Gorizontal':'Vertikal'}`);
+}
+
+// ════ TOOLS ════
+function setTool(t) {
+  tool=t;
+  document.querySelectorAll('.tb[id^="tool-"]').forEach(b=>b.classList.remove('on'));
+  document.getElementById(`tool-${t}`)?.classList.add('on');
+  if(t!=='select'){selectedId=null;redraw()}
+  overlayC.style.cursor=t==='eraser'?'cell':t==='text'?'text':t==='select'?'default':'crosshair';
+}
+function setColor(c){penColor=c;document.querySelectorAll('.csw').forEach(s=>s.classList.remove('on'));document.querySelectorAll('.csw').forEach(s=>{if(s.style.background===c)s.classList.add('on')})}
+function setWidth(v){strokeW=parseInt(v);document.getElementById('width-lbl').textContent=v}
+function setOpacity(v){opacity=parseInt(v)/100;document.getElementById('op-lbl').textContent=v+'%'}
+function toggleFill(){fillOn=!fillOn;document.getElementById('fill-btn').classList.toggle('on',fillOn)}
+
+// ════ RULER ════
+function toggleRuler() {
+  rulerOn=!rulerOn;
+  document.getElementById('tool-ruler').classList.toggle('on',rulerOn);
+  const ci=document.getElementById('canvas-inner');
+  const rh=document.getElementById('ruler-h');
+  const rv=document.getElementById('ruler-v');
+  const rc=document.getElementById('ruler-corner');
+  ci.classList.toggle('ruler-on',rulerOn);
+  [rh,rv,rc].forEach(el=>el.style.display=rulerOn?'block':'none');
+  resizeCanvas();
+  if(rulerOn) drawRulers();
+}
+
+function drawRulers() {
+  const wrap=document.getElementById('wrap');
+  const W=wrap.clientWidth-24, H=wrap.clientHeight-24;
+
+  const rh=document.getElementById('ruler-h');
+  rh.width=W; rh.height=24;
+  const rhctx=rh.getContext('2d');
+  rhctx.clearRect(0,0,W,24);
+  const isLight=document.documentElement.classList.contains('light');
+  rhctx.fillStyle=isLight?'#f5f5fa':'#15151c';
+  rhctx.fillRect(0,0,W,24);
+  rhctx.strokeStyle=isLight?'#c0c0d0':'#2a2a3a';
+  rhctx.fillStyle=isLight?'#6666aa':'#8888a8';
+  rhctx.font='9px DM Mono,monospace';
+  rhctx.textAlign='center';
+
+  // Ruler marks based on zoom
+  const step = scale > 1.5 ? 50 : scale > 0.7 ? 100 : 200;
+  const pxStep = step * scale;
+  const startPx = panX % pxStep;
+
+  for(let x=startPx; x<W; x+=pxStep) {
+    const worldX = Math.round((x - panX) / scale);
+    rhctx.beginPath();rhctx.moveTo(x,18);rhctx.lineTo(x,24);rhctx.stroke();
+    if(Math.abs(worldX)%step===0) rhctx.fillText(worldX,x,12);
   }
 
-  // Stroke dragging
-  if (isDraggingStroke && selectedId) {
-    const dx = world.x - dragStrokeStart.x;
-    const dy = world.y - dragStrokeStart.y;
-    const s = strokes.find(s => s.id === selectedId);
-    if (s) {
-      const orig = dragStrokeOrigin;
-      if (orig.pts?.length) s.pts = orig.pts.map(p => ({ x: p.x+dx, y: p.y+dy }));
-      if (orig.shape) s.shape = { ...orig.shape, x1:(orig.shape.x1||0)+dx, y1:(orig.shape.y1||0)+dy, x2:(orig.shape.x2||0)+dx, y2:(orig.shape.y2||0)+dy, x:(orig.shape.x||0)+dx, y:(orig.shape.y||0)+dy };
+  const rv=document.getElementById('ruler-v');
+  rv.width=24; rv.height=H;
+  const rvctx=rv.getContext('2d');
+  rvctx.clearRect(0,0,24,H);
+  rvctx.fillStyle=isLight?'#f5f5fa':'#15151c';
+  rvctx.fillRect(0,0,24,H);
+  rvctx.strokeStyle=isLight?'#c0c0d0':'#2a2a3a';
+  rvctx.fillStyle=isLight?'#6666aa':'#8888a8';
+  rvctx.font='9px DM Mono,monospace';
+  rvctx.textAlign='right';
+  rvctx.save();
+
+  const startPy = panY % pxStep;
+  for(let y=startPy; y<H; y+=pxStep) {
+    const worldY = Math.round((y - panY) / scale);
+    rvctx.beginPath();rvctx.moveTo(18,y);rvctx.lineTo(24,y);rvctx.stroke();
+    if(Math.abs(worldY)%step===0){
+      rvctx.save();rvctx.translate(12,y);rvctx.rotate(-Math.PI/2);rvctx.fillText(worldY,0,0);rvctx.restore();
+    }
+  }
+  rvctx.restore();
+}
+
+function updateRulerCursor(ex,ey) {
+  if(!rulerOn) return;
+}
+
+// ════ ZOOM ════
+function doZoom(delta,cx,cy) {
+  const wrap=document.getElementById('canvas-inner');
+  const mx=cx??wrap.clientWidth/2, my=cy??wrap.clientHeight/2;
+  const newScale=Math.min(Math.max(scale+delta,0.05),8);
+  panX=mx-(mx-panX)*(newScale/scale);
+  panY=my-(my-panY)*(newScale/scale);
+  scale=newScale;
+  updateZoomDisp();
+  redraw();
+  if(rulerOn) drawRulers();
+}
+function resetZoom(){scale=1;panX=0;panY=0;updateZoomDisp();centerPaper()}
+function updateZoomDisp(){
+  const p=Math.round(scale*100)+'%';
+  document.getElementById('zoom-disp').textContent=p;
+  const ind=document.getElementById('zoom-ind');
+  ind.textContent=p;ind.classList.add('show');
+  clearTimeout(ind._t);ind._t=setTimeout(()=>ind.classList.remove('show'),1200);
+}
+
+// ════ CANVAS COORDS ════
+function toWorld(ex,ey) {
+  const rect=overlayC.getBoundingClientRect();
+  const sx2=overlayC.width/rect.width, sy2=overlayC.height/rect.height;
+  return{x:((ex-rect.left)*sx2-panX)/scale,y:((ey-rect.top)*sy2-panY)/scale};
+}
+
+// ════ EVENTS ════
+overlayC.addEventListener('mousedown',onDown);
+overlayC.addEventListener('mousemove',onMove);
+overlayC.addEventListener('mouseup',onUp);
+overlayC.addEventListener('mouseleave',onUp);
+overlayC.addEventListener('wheel',e=>{e.preventDefault();doZoom(e.deltaY>0?-0.08:0.08,e.clientX,e.clientY)},{passive:false});
+overlayC.addEventListener('contextmenu',onCtx);
+overlayC.addEventListener('touchstart',e=>{e.preventDefault();onDown(e.touches[0])},{passive:false});
+overlayC.addEventListener('touchmove',e=>{e.preventDefault();onMove(e.touches[0])},{passive:false});
+overlayC.addEventListener('touchend',e=>{e.preventDefault();onUp(e.changedTouches[0])},{passive:false});
+document.addEventListener('keydown',onKey);
+document.addEventListener('keyup',e=>{if(e.key===' '){spaceDown=false;overlayC.style.cursor='crosshair'}});
+
+function onKey(e) {
+  if(!roomId) return;
+  if(e.key===' '&&!e.target.matches('input,textarea')){e.preventDefault();spaceDown=true;overlayC.style.cursor='grab'}
+  if(e.ctrlKey&&e.key==='z'){e.preventDefault();undo()}
+  if(e.ctrlKey&&e.key==='y'){e.preventDefault();redo()}
+  if(e.ctrlKey&&e.key==='Enter'){e.preventDefault();addPage()}
+  if(e.ctrlKey&&e.key==='ArrowRight'){e.preventDefault();if(currentPageIdx<pages.length-1)switchPage(currentPageIdx+1)}
+  if(e.ctrlKey&&e.key==='ArrowLeft'){e.preventDefault();if(currentPageIdx>0)switchPage(currentPageIdx-1)}
+  if(e.key==='Escape'){if(textEl){textEl.remove();textEl=null}selectedId=null;redraw()}
+  if((e.key==='Delete'||e.key==='Backspace')&&!e.target.matches('input,textarea')&&selectedId) deleteSelected();
+  if(e.key==='?'&&!e.target.matches('input,textarea')) showShortcuts();
+  if(e.key==='f'&&!e.target.matches('input,textarea')) toggleFullscreen();
+  if(e.key==='0'&&!e.target.matches('input,textarea')) resetZoom();
+  if((e.key==='+'||e.key==='=')&&!e.ctrlKey) doZoom(0.1);
+  if(e.key==='-'&&!e.ctrlKey) doZoom(-0.1);
+  const map={p:'pen',e:'eraser',s:'select',l:'line',t:'text',r:'ruler'};
+  if(!e.ctrlKey&&!e.altKey&&!e.target.matches('input,textarea')&&map[e.key]){
+    if(map[e.key]==='ruler') toggleRuler(); else setTool(map[e.key]);
+  }
+}
+
+function onDown(e) {
+  const world=toWorld(e.clientX,e.clientY);
+  if(spaceDown||e.button===1){isPanning=true;panStart={mx:e.clientX,my:e.clientY,px:panX,py:panY};overlayC.style.cursor='grabbing';return}
+  hideCtx();
+  if(tool==='text'){placeText(world);return}
+  if(tool==='select'){
+    const hit=hitTest(world.x,world.y);
+    if(hit){selectedId=hit.id;isDragging=true;dragStart={x:world.x,y:world.y};dragOrigin=JSON.parse(JSON.stringify(hit));redraw()}
+    else{selectedId=null;redraw()}
+    return;
+  }
+  drawing=true;sx=world.x;sy=world.y;pts=[{x:world.x,y:world.y}];
+  strokeId=crypto.randomUUID();
+  socket?.emit('stroke-start',{tool,color:penColor,w:strokeW,opacity,fill:fillOn?penColor:null,strokeId});
+}
+
+function onMove(e) {
+  const world=toWorld(e.clientX,e.clientY);
+  socket?.emit('cursor-move',{x:world.x,y:world.y});
+  if(isPanning&&panStart){
+    panX=panStart.px+(e.clientX-panStart.mx);
+    panY=panStart.py+(e.clientY-panStart.my);
+    redraw();
+    if(rulerOn) drawRulers();
+    return;
+  }
+  if(isDragging&&selectedId){
+    const dx=world.x-dragStart.x, dy=world.y-dragStart.y;
+    const s=curStrokes().find(s=>s.id===selectedId);
+    if(s){
+      const o=dragOrigin;
+      if(o.pts?.length) s.pts=o.pts.map(p=>({x:p.x+dx,y:p.y+dy}));
+      if(o.shape) s.shape={...o.shape,x1:(o.shape.x1||0)+dx,y1:(o.shape.y1||0)+dy,x2:(o.shape.x2||0)+dx,y2:(o.shape.y2||0)+dy,x:(o.shape.x||0)+dx,y:(o.shape.y||0)+dy};
       redraw();
     }
     return;
   }
-
-  if (!drawing) return;
-
-  if (tool === 'pen' || tool === 'eraser') {
-    // Smoothing: average last points
-    pts.push({ x: world.x, y: world.y });
-    socket?.emit('stroke-point', { x: world.x, y: world.y });
-  }
-
+  if(!drawing) return;
+  if(tool==='pen'||tool==='eraser'){pts.push({x:world.x,y:world.y});socket?.emit('stroke-point',{x:world.x,y:world.y})}
   drawOverlay(world);
 }
 
 function onUp(e) {
-  overlayC.style.cursor = spaceDown ? 'grab' : tool==='select' ? 'default' : 'crosshair';
-
-  if (isPanning) { isPanning = false; panStart = null; return; }
-
-  if (isDraggingStroke && selectedId) {
-    isDraggingStroke = false;
-    const s = strokes.find(s => s.id === selectedId);
-    if (s) {
-      socket?.emit('stroke-move', { strokeId: selectedId, newPoints: s.pts, newShapeData: s.shape });
-    }
-    dragStrokeOrigin = null;
-    return;
+  overlayC.style.cursor=spaceDown?'grab':tool==='select'?'default':'crosshair';
+  if(isPanning){isPanning=false;panStart=null;return}
+  if(isDragging&&selectedId){
+    isDragging=false;
+    const s=curStrokes().find(s=>s.id===selectedId);
+    if(s) socket?.emit('stroke-move',{strokeId:selectedId,newPoints:s.pts,newShapeData:s.shape});
+    dragOrigin=null;return;
   }
-
-  if (!drawing) return;
-  drawing = false;
-
-  const world = toWorld(e.clientX || 0, e.clientY || 0);
-  const shape = getShape(world);
-  const zIdx = strokes.length;
-
-  const sdata = {
-    strokeId, tool, points: smoothPts(pts), shapeData: shape,
-    color, width: strokeW, opacity, fillColor: fillOn ? color : null, zIndex: zIdx,
-  };
-
-  strokes.push({ id: strokeId, tool, pts: smoothPts(pts), shape, color, w: strokeW, opacity, fill: fillOn ? color : null, zIdx, userId: me?.userId });
-  strokes.sort((a,b) => (a.zIdx||0)-(b.zIdx||0));
-  socket?.emit('stroke-end', sdata);
-  undoStack = []; // redo stack tozalash
-
-  pts = [];
-  octx.clearRect(0, 0, overlayC.width, overlayC.height);
+  if(!drawing) return;
+  drawing=false;
+  const world=toWorld(e.clientX||0,e.clientY||0);
+  const shape=(['line','rect','circle','triangle','arrow'].includes(tool))?{x1:sx,y1:sy,x2:world.x,y2:world.y}:null;
+  const zIdx=curStrokes().length;
+  const sdata={strokeId,tool,points:smoothPts(pts),shapeData:shape,color:penColor,width:strokeW,opacity,fillColor:fillOn?penColor:null,zIndex:zIdx};
+  curPage()?.strokes.push({id:strokeId,tool,pts:smoothPts(pts),shape,color:penColor,w:strokeW,opacity,fill:fillOn?penColor:null,zIdx,userId:me?.userId});
+  curPage()?.strokes.sort((a,b)=>(a.zIdx||0)-(b.zIdx||0));
+  socket?.emit('stroke-end',sdata);
+  undoStack=[];pts=[];
+  octx.clearRect(0,0,overlayC.width,overlayC.height);
   redraw();
+  updateThumb(currentPageIdx);
 }
 
-function getShape(pos) {
-  if (!['line','rect','circle','triangle','arrow'].includes(tool)) return null;
-  return { x1: sx, y1: sy, x2: pos.x, y2: pos.y };
+// ════ SMOOTH ════
+function smoothPts(points,tension=0.4){
+  if(points.length<4) return points;
+  return points.map((p,i)=>{
+    if(i===0||i===points.length-1) return p;
+    return{x:p.x*(1-tension)+(points[i-1].x+points[i+1].x)*tension/2,y:p.y*(1-tension)+(points[i-1].y+points[i+1].y)*tension/2};
+  });
 }
 
-// ════════════════════════════════════════════════════
-// STROKE SMOOTHING
-// ════════════════════════════════════════════════════
-function smoothPts(points, tension = 0.5) {
-  if (points.length < 4) return points;
-  const result = [];
-  for (let i = 0; i < points.length; i++) {
-    if (i === 0 || i === points.length - 1) { result.push(points[i]); continue; }
-    result.push({
-      x: points[i].x * (1 - tension) + (points[i-1].x + points[i+1].x) * tension / 2,
-      y: points[i].y * (1 - tension) + (points[i-1].y + points[i+1].y) * tension / 2,
-    });
-  }
-  return result;
-}
-
-// ════════════════════════════════════════════════════
-// HIT TEST (select tool)
-// ════════════════════════════════════════════════════
-function hitTest(wx, wy) {
-  // Tepadan pastga test (z-order)
-  for (let i = strokes.length - 1; i >= 0; i--) {
-    const s = strokes[i];
-    if (strokeHit(s, wx, wy)) return s;
-  }
+// ════ HIT TEST ════
+function hitTest(wx,wy){
+  const ss=curStrokes();
+  for(let i=ss.length-1;i>=0;i--){if(strokeHit(ss[i],wx,wy)) return ss[i]}
   return null;
 }
-
-function strokeHit(s, wx, wy) {
-  const THRESH = 10 / scale;
-  if (s.tool === 'pen' || s.tool === 'eraser') {
-    if (!s.pts?.length) return false;
-    for (let i = 1; i < s.pts.length; i++) {
-      if (distToSeg(wx, wy, s.pts[i-1], s.pts[i]) < THRESH) return true;
-    }
-    return false;
-  }
-  if (s.tool === 'image' && s.shape) {
-    const { x, y, width: w, height: h } = s.shape;
-    return wx >= x && wx <= x+w && wy >= y && wy <= y+h;
-  }
-  if (s.shape) {
-    const { x1=0, y1=0, x2=0, y2=0 } = s.shape;
-    const minX = Math.min(x1,x2)-THRESH, maxX = Math.max(x1,x2)+THRESH;
-    const minY = Math.min(y1,y2)-THRESH, maxY = Math.max(y1,y2)+THRESH;
-    return wx >= minX && wx <= maxX && wy >= minY && wy <= maxY;
-  }
-  if (s.tool === 'text' && s.shape) {
-    return Math.abs(wx - s.shape.x) < 100 && Math.abs(wy - s.shape.y) < 30;
-  }
+function strokeHit(s,wx,wy){
+  const T=10/scale;
+  if(s.tool==='pen'||s.tool==='eraser'){if(!s.pts?.length) return false;for(let i=1;i<s.pts.length;i++){if(distSeg(wx,wy,s.pts[i-1],s.pts[i])<T) return true}return false}
+  if(s.tool==='image'&&s.shape) return wx>=s.shape.x&&wx<=s.shape.x+s.shape.width&&wy>=s.shape.y&&wy<=s.shape.y+s.shape.height;
+  if(s.shape){const{x1=0,y1=0,x2=0,y2=0}=s.shape;return wx>=Math.min(x1,x2)-T&&wx<=Math.max(x1,x2)+T&&wy>=Math.min(y1,y2)-T&&wy<=Math.max(y1,y2)+T}
+  if(s.tool==='text'&&s.shape) return Math.abs(wx-s.shape.x)<100&&Math.abs(wy-s.shape.y)<30;
   return false;
 }
+function distSeg(px,py,a,b){const dx=b.x-a.x,dy=b.y-a.y,l2=dx*dx+dy*dy;if(!l2) return Math.hypot(px-a.x,py-a.y);const t=Math.max(0,Math.min(1,((px-a.x)*dx+(py-a.y)*dy)/l2));return Math.hypot(px-(a.x+t*dx),py-(a.y+t*dy))}
 
-function distToSeg(px, py, a, b) {
-  const dx = b.x-a.x, dy = b.y-a.y;
-  const len2 = dx*dx+dy*dy;
-  if (!len2) return Math.hypot(px-a.x, py-a.y);
-  const t = Math.max(0, Math.min(1, ((px-a.x)*dx+(py-a.y)*dy)/len2));
-  return Math.hypot(px-(a.x+t*dx), py-(a.y+t*dy));
+// ════ DRAW ════
+function applyStyle(c,s){
+  c.globalAlpha=s.opacity??1;c.strokeStyle=s.color||'#fff';
+  c.fillStyle=s.fill||s.color||'#fff';c.lineWidth=(s.w||3)/scale;
+  c.lineCap='round';c.lineJoin='round';
 }
 
-// ════════════════════════════════════════════════════
-// DRAW
-// ════════════════════════════════════════════════════
-function applyCtxStyle(c, s) {
-  c.globalAlpha = s.opacity ?? 1;
-  c.strokeStyle = s.color || '#fff';
-  c.fillStyle = s.fill || s.color || '#fff';
-  c.lineWidth = (s.w || 3) / scale;
-  c.lineCap = 'round';
-  c.lineJoin = 'round';
-}
-
-function drawStroke(c, s) {
-  c.save();
-  applyCtxStyle(c, s);
-  switch(s.tool) {
-    case 'pen': drawPen(c, s.pts); break;
-    case 'eraser':
-      c.globalCompositeOperation = 'destination-out';
-      c.globalAlpha = 1;
-      c.lineWidth = (s.w * 3) / scale;
-      drawPen(c, s.pts);
-      c.globalCompositeOperation = 'source-over';
-      break;
-    case 'line': if(s.shape) { c.beginPath(); c.moveTo(s.shape.x1,s.shape.y1); c.lineTo(s.shape.x2,s.shape.y2); c.stroke(); } break;
-    case 'rect': if(s.shape) drawRect(c,s.shape,s.fill); break;
-    case 'circle': if(s.shape) drawCircle(c,s.shape,s.fill); break;
-    case 'triangle': if(s.shape) drawTriangle(c,s.shape,s.fill); break;
-    case 'arrow': if(s.shape) drawArrow(c,s.shape); break;
-    case 'text':
-      if(s.shape&&s.text) {
-        c.font = `${(s.fontSize||18)}px 'DM Sans',sans-serif`;
-        c.fillStyle = s.color; c.globalAlpha = s.opacity||1;
-        c.fillText(s.text, s.shape.x, s.shape.y);
-      }
-      break;
-    case 'image':
-      if(s.imgData&&s.shape) {
-        const img = s._img || (s._img = new Image());
-        if (!s._loaded) {
-          img.onload = () => { s._loaded = true; redraw(); };
-          img.src = s.imgData;
-        } else {
-          c.globalAlpha = 1;
-          c.drawImage(img, s.shape.x, s.shape.y, s.shape.width, s.shape.height);
-        }
-      }
-      break;
+function drawStroke(c,s){
+  c.save();applyStyle(c,s);
+  switch(s.tool){
+    case 'pen':drawPen(c,s.pts);break;
+    case 'eraser':c.globalCompositeOperation='destination-out';c.globalAlpha=1;c.lineWidth=(s.w*3)/scale;drawPen(c,s.pts);c.globalCompositeOperation='source-over';break;
+    case 'line':if(s.shape){c.beginPath();c.moveTo(s.shape.x1,s.shape.y1);c.lineTo(s.shape.x2,s.shape.y2);c.stroke()}break;
+    case 'rect':if(s.shape){const x=Math.min(s.shape.x1,s.shape.x2),y=Math.min(s.shape.y1,s.shape.y2),w=Math.abs(s.shape.x2-s.shape.x1),h=Math.abs(s.shape.y2-s.shape.y1);c.beginPath();c.rect(x,y,w,h);if(s.fill)c.fill();c.stroke()}break;
+    case 'circle':if(s.shape){const cx=(s.shape.x1+s.shape.x2)/2,cy=(s.shape.y1+s.shape.y2)/2,rx=Math.abs(s.shape.x2-s.shape.x1)/2,ry=Math.abs(s.shape.y2-s.shape.y1)/2;c.beginPath();c.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);if(s.fill)c.fill();c.stroke()}break;
+    case 'triangle':if(s.shape){c.beginPath();c.moveTo((s.shape.x1+s.shape.x2)/2,s.shape.y1);c.lineTo(s.shape.x2,s.shape.y2);c.lineTo(s.shape.x1,s.shape.y2);c.closePath();if(s.fill)c.fill();c.stroke()}break;
+    case 'arrow':if(s.shape)drawArrow(c,s.shape);break;
+    case 'text':if(s.shape&&s.text){c.font=`${s.fontSize||18}px 'DM Sans',sans-serif`;c.fillStyle=s.color;c.globalAlpha=s.opacity||1;c.fillText(s.text,s.shape.x,s.shape.y)}break;
+    case 'image':if(s.imgData&&s.shape){const img=s._img||(s._img=new Image());if(!s._loaded){img.onload=()=>{s._loaded=true;redraw()};img.src=s.imgData}else{c.globalAlpha=1;c.drawImage(img,s.shape.x,s.shape.y,s.shape.width,s.shape.height)}}break;
   }
   c.restore();
 }
 
-function drawPen(c, points) {
-  if (!points?.length) return;
-  if (points.length === 1) {
-    c.beginPath(); c.arc(points[0].x, points[0].y, (c.lineWidth||1)/2, 0, Math.PI*2); c.fill(); return;
-  }
-  c.beginPath(); c.moveTo(points[0].x, points[0].y);
-  for (let i = 1; i < points.length-1; i++) {
-    const mx = (points[i].x+points[i+1].x)/2, my = (points[i].y+points[i+1].y)/2;
-    c.quadraticCurveTo(points[i].x, points[i].y, mx, my);
-  }
-  c.lineTo(points[points.length-1].x, points[points.length-1].y);
-  c.stroke();
+function drawPen(c,points){
+  if(!points?.length) return;
+  if(points.length===1){c.beginPath();c.arc(points[0].x,points[0].y,(c.lineWidth||1)/2,0,Math.PI*2);c.fill();return}
+  c.beginPath();c.moveTo(points[0].x,points[0].y);
+  for(let i=1;i<points.length-1;i++){const mx=(points[i].x+points[i+1].x)/2,my=(points[i].y+points[i+1].y)/2;c.quadraticCurveTo(points[i].x,points[i].y,mx,my)}
+  c.lineTo(points[points.length-1].x,points[points.length-1].y);c.stroke();
 }
 
-function drawRect(c, d, fill) {
-  const x=Math.min(d.x1,d.x2), y=Math.min(d.y1,d.y2), w=Math.abs(d.x2-d.x1), h=Math.abs(d.y2-d.y1);
-  c.beginPath(); c.rect(x,y,w,h);
-  if(fill) c.fill(); c.stroke();
-}
-
-function drawCircle(c, d, fill) {
-  const cx=(d.x1+d.x2)/2, cy=(d.y1+d.y2)/2, rx=Math.abs(d.x2-d.x1)/2, ry=Math.abs(d.y2-d.y1)/2;
-  c.beginPath(); c.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);
-  if(fill) c.fill(); c.stroke();
-}
-
-function drawTriangle(c, d, fill) {
-  c.beginPath(); c.moveTo((d.x1+d.x2)/2,d.y1); c.lineTo(d.x2,d.y2); c.lineTo(d.x1,d.y2); c.closePath();
-  if(fill) c.fill(); c.stroke();
-}
-
-function drawArrow(c, d) {
-  const dx=d.x2-d.x1, dy=d.y2-d.y1, angle=Math.atan2(dy,dx);
-  const len=Math.sqrt(dx*dx+dy*dy), hl=Math.min(20/scale, len*0.3);
-  c.beginPath(); c.moveTo(d.x1,d.y1); c.lineTo(d.x2,d.y2); c.stroke();
-  c.beginPath();
-  c.moveTo(d.x2,d.y2); c.lineTo(d.x2-hl*Math.cos(angle-Math.PI/6), d.y2-hl*Math.sin(angle-Math.PI/6));
-  c.moveTo(d.x2,d.y2); c.lineTo(d.x2-hl*Math.cos(angle+Math.PI/6), d.y2-hl*Math.sin(angle+Math.PI/6));
-  c.stroke();
+function drawArrow(c,d){
+  const dx=d.x2-d.x1,dy=d.y2-d.y1,angle=Math.atan2(dy,dx),len=Math.sqrt(dx*dx+dy*dy),hl=Math.min(20/scale,len*0.3);
+  c.beginPath();c.moveTo(d.x1,d.y1);c.lineTo(d.x2,d.y2);c.stroke();
+  c.beginPath();c.moveTo(d.x2,d.y2);c.lineTo(d.x2-hl*Math.cos(angle-Math.PI/6),d.y2-hl*Math.sin(angle-Math.PI/6));c.moveTo(d.x2,d.y2);c.lineTo(d.x2-hl*Math.cos(angle+Math.PI/6),d.y2-hl*Math.sin(angle+Math.PI/6));c.stroke();
 }
 
 function drawOverlay(pos) {
   octx.clearRect(0,0,overlayC.width,overlayC.height);
-  octx.save();
-  octx.translate(panX, panY);
-  octx.scale(scale, scale);
-
-  // Current user drawing
-  if (drawing && pos) {
-    octx.globalAlpha = opacity;
-    octx.strokeStyle = color;
-    octx.fillStyle = color;
-    octx.lineWidth = strokeW / scale;
-    octx.lineCap = 'round'; octx.lineJoin = 'round';
-    const d = { x1: sx, y1: sy, x2: pos.x, y2: pos.y };
-    switch(tool) {
-      case 'pen': drawPen(octx, pts); break;
-      case 'eraser': octx.globalCompositeOperation='destination-out'; octx.lineWidth=(strokeW*3)/scale; drawPen(octx,pts); octx.globalCompositeOperation='source-over'; break;
-      case 'line': octx.beginPath(); octx.moveTo(d.x1,d.y1); octx.lineTo(d.x2,d.y2); octx.stroke(); break;
-      case 'rect': drawRect(octx,d,fillOn?color:null); break;
-      case 'circle': drawCircle(octx,d,fillOn?color:null); break;
-      case 'triangle': drawTriangle(octx,d,fillOn?color:null); break;
-      case 'arrow': drawArrow(octx,d); break;
+  octx.save();octx.translate(panX,panY);octx.scale(scale,scale);
+  if(drawing&&pos){
+    octx.globalAlpha=opacity;octx.strokeStyle=penColor;octx.fillStyle=penColor;octx.lineWidth=strokeW/scale;octx.lineCap='round';octx.lineJoin='round';
+    const d={x1:sx,y1:sy,x2:pos.x,y2:pos.y};
+    switch(tool){
+      case 'pen':drawPen(octx,pts);break;
+      case 'eraser':octx.globalCompositeOperation='destination-out';octx.lineWidth=(strokeW*3)/scale;drawPen(octx,pts);octx.globalCompositeOperation='source-over';break;
+      case 'line':octx.beginPath();octx.moveTo(d.x1,d.y1);octx.lineTo(d.x2,d.y2);octx.stroke();break;
+      case 'rect':{const x=Math.min(d.x1,d.x2),y=Math.min(d.y1,d.y2),w=Math.abs(d.x2-d.x1),h=Math.abs(d.y2-d.y1);octx.beginPath();octx.rect(x,y,w,h);if(fillOn)octx.fill();octx.stroke();break}
+      case 'circle':{const cx=(d.x1+d.x2)/2,cy=(d.y1+d.y2)/2,rx=Math.abs(d.x2-d.x1)/2,ry=Math.abs(d.y2-d.y1)/2;octx.beginPath();octx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);if(fillOn)octx.fill();octx.stroke();break}
+      case 'triangle':octx.beginPath();octx.moveTo((d.x1+d.x2)/2,d.y1);octx.lineTo(d.x2,d.y2);octx.lineTo(d.x1,d.y2);octx.closePath();if(fillOn)octx.fill();octx.stroke();break;
+      case 'arrow':drawArrow(octx,d);break;
     }
   }
-
-  // Remote strokes
-  Object.values(remoteDrawing).forEach(rd => {
-    octx.save();
-    octx.globalAlpha = rd.opacity||1; octx.strokeStyle = rd.color; octx.lineWidth = (rd.w||3)/scale;
-    octx.lineCap = 'round'; octx.lineJoin = 'round';
-    drawPen(octx, rd.pts);
-    octx.restore();
-  });
-
+  Object.values(remoteDrawing).forEach(rd=>{octx.save();octx.globalAlpha=rd.opacity||1;octx.strokeStyle=rd.color;octx.lineWidth=(rd.w||3)/scale;octx.lineCap='round';octx.lineJoin='round';drawPen(octx,rd.pts);octx.restore()});
   octx.restore();
-
-  // Selection highlight
-  if (selectedId) {
-    const s = strokes.find(s => s.id === selectedId);
-    if (s) drawSelectionHandle(s);
-  }
+  // Selection
+  if(selectedId){const s=curStrokes().find(s=>s.id===selectedId);if(s) drawSel(s)}
 }
 
-function drawSelectionHandle(s) {
-  const box = getStrokeBounds(s);
-  if (!box) return;
-  const { x, y, w, h } = box;
-
-  // Transform box ke screen
-  const sx2 = x * scale + panX, sy2 = y * scale + panY;
-  const sw = w * scale, sh = h * scale;
-  const pad = 8;
-
-  octx.save();
-  octx.strokeStyle = '#7c6dfa';
-  octx.lineWidth = 1.5;
-  octx.setLineDash([6, 3]);
-  octx.strokeRect(sx2 - pad, sy2 - pad, sw + pad*2, sh + pad*2);
-  octx.setLineDash([]);
-
-  // Handles
-  const handles = [
-    [sx2-pad, sy2-pad], [sx2+sw/2, sy2-pad], [sx2+sw+pad, sy2-pad],
-    [sx2-pad, sy2+sh/2], [sx2+sw+pad, sy2+sh/2],
-    [sx2-pad, sy2+sh+pad], [sx2+sw/2, sy2+sh+pad], [sx2+sw+pad, sy2+sh+pad],
-  ];
-  octx.fillStyle = '#7c6dfa';
-  handles.forEach(([hx,hy]) => { octx.beginPath(); octx.arc(hx,hy,4,0,Math.PI*2); octx.fill(); });
+function drawSel(s){
+  const b=getBounds(s);if(!b) return;
+  const{x,y,w,h}=b;const sx2=x*scale+panX,sy2=y*scale+panY,sw=w*scale,sh=h*scale,pad=8;
+  octx.save();octx.strokeStyle='#7c6dfa';octx.lineWidth=1.5;octx.setLineDash([5,3]);
+  octx.strokeRect(sx2-pad,sy2-pad,sw+pad*2,sh+pad*2);octx.setLineDash([]);
+  octx.fillStyle='#7c6dfa';
+  [[sx2-pad,sy2-pad],[sx2+sw/2,sy2-pad],[sx2+sw+pad,sy2-pad],[sx2-pad,sy2+sh/2],[sx2+sw+pad,sy2+sh/2],[sx2-pad,sy2+sh+pad],[sx2+sw/2,sy2+sh+pad],[sx2+sw+pad,sy2+sh+pad]].forEach(([hx,hy])=>{octx.beginPath();octx.arc(hx,hy,4,0,Math.PI*2);octx.fill()});
   octx.restore();
 }
 
-function getStrokeBounds(s) {
-  if (s.tool === 'image' && s.shape) return { x: s.shape.x, y: s.shape.y, w: s.shape.width, h: s.shape.height };
-  if (s.shape) {
-    const { x1=0, y1=0, x2=0, y2=0 } = s.shape;
-    return { x: Math.min(x1,x2), y: Math.min(y1,y2), w: Math.abs(x2-x1), h: Math.abs(y2-y1) };
-  }
-  if (s.pts?.length) {
-    const xs = s.pts.map(p=>p.x), ys = s.pts.map(p=>p.y);
-    const minX = Math.min(...xs), minY = Math.min(...ys);
-    return { x: minX, y: minY, w: Math.max(...xs)-minX, h: Math.max(...ys)-minY };
-  }
+function getBounds(s){
+  if(s.tool==='image'&&s.shape) return{x:s.shape.x,y:s.shape.y,w:s.shape.width,h:s.shape.height};
+  if(s.shape){const{x1=0,y1=0,x2=0,y2=0}=s.shape;return{x:Math.min(x1,x2),y:Math.min(y1,y2),w:Math.abs(x2-x1),h:Math.abs(y2-y1)}}
+  if(s.pts?.length){const xs=s.pts.map(p=>p.x),ys=s.pts.map(p=>p.y),mx=Math.min(...xs),my=Math.min(...ys);return{x:mx,y:my,w:Math.max(...xs)-mx,h:Math.max(...ys)-my}}
   return null;
 }
 
-function redraw() {
-  ctx.clearRect(0, 0, mainC.width, mainC.height);
-  ctx.save();
-  ctx.translate(panX, panY);
-  ctx.scale(scale, scale);
-  strokes.forEach(s => drawStroke(ctx, s));
+function redraw(){
+  ctx.clearRect(0,0,mainC.width,mainC.height);
+  ctx.save();ctx.translate(panX,panY);ctx.scale(scale,scale);
+  // Draw paper
+  const pg=curPage();
+  if(pg){
+    const pd=paperDims(pg);
+    const isLight=document.documentElement.classList.contains('light');
+    ctx.shadowColor='rgba(0,0,0,'+(isLight?'.15':'.5')+')';
+    ctx.shadowBlur=30/scale;
+    ctx.fillStyle=isLight?'#fff':'#1c1c28';
+    ctx.fillRect(0,0,pd.w,pd.h);
+    ctx.shadowBlur=0;
+    // Clip to paper
+    ctx.save();ctx.beginPath();ctx.rect(0,0,pd.w,pd.h);ctx.clip();
+    curStrokes().forEach(s=>drawStroke(ctx,s));
+    ctx.restore();
+    // Border
+    ctx.strokeStyle=isLight?'rgba(0,0,0,.08)':'rgba(255,255,255,.06)';
+    ctx.lineWidth=1/scale;
+    ctx.strokeRect(0,0,pd.w,pd.h);
+  }
   ctx.restore();
   drawOverlay();
 }
 
-// ════════════════════════════════════════════════════
-// TEXT TOOL
-// ════════════════════════════════════════════════════
-function placeText(world) {
-  if (textEl) textEl.remove();
-  const screenX = world.x * scale + panX;
-  const screenY = world.y * scale + panY;
-  const fs = Math.max(strokeW * 4, 16) * scale;
-
-  textEl = document.createElement('textarea');
-  textEl.style.cssText = `
-    position:absolute;left:${screenX}px;top:${screenY}px;
-    background:rgba(124,109,250,.12);border:1px dashed #7c6dfa;
-    color:${color};font-size:${fs}px;font-family:'DM Sans',sans-serif;
-    outline:none;resize:both;min-width:120px;min-height:40px;
-    padding:4px 8px;border-radius:6px;z-index:350;pointer-events:all;
-  `;
-  document.getElementById('wrap').appendChild(textEl);
-  textEl.focus();
-  textEl.addEventListener('blur', () => {
-    const txt = textEl.value.trim();
-    if (txt) {
-      const sid = crypto.randomUUID();
-      const shapeData = { x: world.x, y: world.y + Math.max(strokeW*4,16) };
-      const sdata = { strokeId: sid, tool:'text', points:[], shapeData, color, width: strokeW, opacity, fillColor: null, fontSize: Math.max(strokeW*4,16), textContent: txt, zIndex: strokes.length };
-      strokes.push({ id: sid, tool:'text', pts:[], shape: shapeData, color, w: strokeW, opacity, text: txt, fontSize: Math.max(strokeW*4,16), zIdx: strokes.length, userId: me?.userId });
-      socket?.emit('stroke-end', sdata);
-      redraw();
+// ════ TEXT ════
+function placeText(world){
+  if(textEl) textEl.remove();
+  const sx2=world.x*scale+panX, sy2=world.y*scale+panY;
+  const fs=Math.max(strokeW*4,16)*scale;
+  textEl=document.createElement('textarea');
+  textEl.style.cssText=`position:absolute;left:${sx2}px;top:${sy2}px;background:rgba(124,109,250,.1);border:1px dashed #7c6dfa;color:${penColor};font-size:${fs}px;font-family:'DM Sans',sans-serif;outline:none;resize:both;min-width:120px;min-height:40px;padding:4px 8px;border-radius:6px;z-index:350;pointer-events:all`;
+  document.getElementById('canvas-inner').appendChild(textEl);textEl.focus();
+  textEl.addEventListener('blur',()=>{
+    const txt=textEl.value.trim();
+    if(txt){
+      const sid=crypto.randomUUID();const shp={x:world.x,y:world.y+Math.max(strokeW*4,16)};
+      const sd={strokeId:sid,tool:'text',points:[],shapeData:shp,color:penColor,width:strokeW,opacity,fillColor:null,fontSize:Math.max(strokeW*4,16),textContent:txt,zIndex:curStrokes().length};
+      curPage()?.strokes.push({id:sid,tool:'text',pts:[],shape:shp,color:penColor,w:strokeW,opacity,text:txt,fontSize:Math.max(strokeW*4,16),zIdx:curStrokes().length,userId:me?.userId});
+      socket?.emit('stroke-end',sd);redraw();updateThumb(currentPageIdx);
     }
-    textEl.remove(); textEl = null;
+    textEl.remove();textEl=null;
   });
-  textEl.addEventListener('keydown', e => { if(e.key==='Escape'){textEl.remove();textEl=null;} });
+  textEl.addEventListener('keydown',e=>{if(e.key==='Escape'){textEl.remove();textEl=null}});
 }
 
-// ════════════════════════════════════════════════════
-// UNDO / REDO
-// ════════════════════════════════════════════════════
-function undo() {
-  if (!me) return;
-  const mine = strokes.filter(s => s.userId === me.userId);
-  if (!mine.length) return;
-  const last = mine[mine.length-1];
+// ════ UNDO / REDO ════
+function undo(){
+  if(!me) return;
+  const mine=curStrokes().filter(s=>s.userId===me.userId);
+  if(!mine.length) return;
+  const last=mine[mine.length-1];
   undoStack.push(last);
-  strokes = strokes.filter(s => s.id !== last.id);
-  if (selectedId === last.id) selectedId = null;
-  redraw();
+  curPage().strokes=curStrokes().filter(s=>s.id!==last.id);
+  if(selectedId===last.id) selectedId=null;
+  redraw();updateThumb(currentPageIdx);
   socket?.emit('undo');
 }
 
-function redo() {
-  if (!undoStack.length) return;
-  const s = undoStack.pop();
-  strokes.push(s);
-  strokes.sort((a,b) => (a.zIdx||0)-(b.zIdx||0));
-  redraw();
-  // Server ga ham qaytarish
-  socket?.emit('stroke-end', {
-    strokeId: s.id, tool: s.tool, points: s.pts, shapeData: s.shape,
-    color: s.color, width: s.w, opacity: s.opacity, fillColor: s.fill,
-    fontSize: s.fontSize, textContent: s.text, zIndex: s.zIdx,
-  });
+function redo(){
+  if(!undoStack.length) return;
+  const s=undoStack.pop();
+  curPage()?.strokes.push(s);
+  curPage()?.strokes.sort((a,b)=>(a.zIdx||0)-(b.zIdx||0));
+  redraw();updateThumb(currentPageIdx);
+  socket?.emit('stroke-end',{strokeId:s.id,tool:s.tool,points:s.pts,shapeData:s.shape,color:s.color,width:s.w,opacity:s.opacity,fillColor:s.fill,fontSize:s.fontSize,textContent:s.text,zIndex:s.zIdx});
 }
 
-// ════════════════════════════════════════════════════
-// SELECT TOOL ACTIONS
-// ════════════════════════════════════════════════════
-function deleteSelected() {
-  if (!selectedId) return;
-  strokes = strokes.filter(s => s.id !== selectedId);
-  socket?.emit('undo'); // server da ham o'chirish — real case da alohida event kerak
-  redraw();
-  selectedId = null;
-  hideCtx();
-}
+// ════ SELECT ACTIONS ════
+function deleteSelected(){if(!selectedId) return;curPage().strokes=curStrokes().filter(s=>s.id!==selectedId);socket?.emit('undo');redraw();selectedId=null;hideCtx();updateThumb(currentPageIdx)}
+function bringFront(){if(!selectedId) return;const mz=Math.max(...curStrokes().map(s=>s.zIdx||0))+1;const s=curStrokes().find(s=>s.id===selectedId);if(s){s.zIdx=mz;socket?.emit('stroke-zindex',{strokeId:selectedId,zIndex:mz});curPage().strokes.sort((a,b)=>(a.zIdx||0)-(b.zIdx||0));redraw()}hideCtx()}
+function sendBack(){if(!selectedId) return;const mz=Math.min(...curStrokes().map(s=>s.zIdx||0))-1;const s=curStrokes().find(s=>s.id===selectedId);if(s){s.zIdx=mz;socket?.emit('stroke-zindex',{strokeId:selectedId,zIndex:mz});curPage().strokes.sort((a,b)=>(a.zIdx||0)-(b.zIdx||0));redraw()}hideCtx()}
 
-function bringFront() {
-  if (!selectedId) return;
-  const maxZ = Math.max(...strokes.map(s => s.zIdx||0)) + 1;
-  const s = strokes.find(s => s.id === selectedId);
-  if (s) { s.zIdx = maxZ; socket?.emit('stroke-zindex', { strokeId: selectedId, zIndex: maxZ }); strokes.sort((a,b)=>(a.zIdx||0)-(b.zIdx||0)); redraw(); }
-  hideCtx();
-}
+// ════ CLEAR ════
+function clearAll(){if(!confirm('Barcha chizmalar o\'chiriladi?')) return;if(curPage())curPage().strokes=[];selectedId=null;undoStack=[];redraw();socket?.emit('clear-board');updateThumb(currentPageIdx);hideCtx()}
 
-function sendBack() {
-  if (!selectedId) return;
-  const minZ = Math.min(...strokes.map(s => s.zIdx||0)) - 1;
-  const s = strokes.find(s => s.id === selectedId);
-  if (s) { s.zIdx = minZ; socket?.emit('stroke-zindex', { strokeId: selectedId, zIndex: minZ }); strokes.sort((a,b)=>(a.zIdx||0)-(b.zIdx||0)); redraw(); }
-  hideCtx();
-}
-
-// ════════════════════════════════════════════════════
-// CONTEXT MENU
-// ════════════════════════════════════════════════════
-function onCtx(e) {
-  e.preventDefault();
-  const world = toWorld(e.clientX, e.clientY);
-  ctxTarget = hitTest(world.x, world.y);
-  const menu = document.getElementById('ctx');
-  const hasTarget = !!ctxTarget;
-  document.getElementById('ctx-front').style.display = hasTarget ? 'flex' : 'none';
-  document.getElementById('ctx-back').style.display = hasTarget ? 'flex' : 'none';
-  document.getElementById('ctx-del').style.display = hasTarget ? 'flex' : 'none';
-  document.getElementById('ctx-sep2').style.display = hasTarget ? 'block' : 'none';
-  if (hasTarget) { selectedId = ctxTarget.id; redraw(); }
-  menu.style.display = 'block';
-  menu.style.left = e.clientX + 'px';
-  menu.style.top = e.clientY + 'px';
-}
-function hideCtx() { document.getElementById('ctx').style.display = 'none'; }
-function ctxUndo() { undo(); hideCtx(); }
-function ctxRedo() { redo(); hideCtx(); }
-document.addEventListener('click', e => { if(!e.target.closest('#ctx')) hideCtx(); });
-
-// ════════════════════════════════════════════════════
-// CLEAR
-// ════════════════════════════════════════════════════
-function clearAll() {
-  if (!confirm('Barcha chizmalar o\'chiriladi. Davom etasizmi?')) return;
-  strokes = []; selectedId = null; undoStack = [];
-  redraw(); socket?.emit('clear-board'); hideCtx();
-}
-
-// ════════════════════════════════════════════════════
-// IMAGE
-// ════════════════════════════════════════════════════
-function loadImage(e) {
-  const file = e.target.files[0]; if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    const img = new Image();
-    img.onload = () => {
-      let w = img.width, h = img.height;
-      if (w > imgMaxW) { h = h*imgMaxW/w; w = imgMaxW; }
-      if (h > imgMaxH) { w = w*imgMaxH/h; h = imgMaxH; }
-      // Canvas markaziga joylash (world koordinatada)
-      const wrap = document.getElementById('wrap');
-      const cx = (wrap.clientWidth/2 - panX) / scale;
-      const cy = (wrap.clientHeight/2 - panY) / scale;
-      const x = cx - w/2, y = cy - h/2;
-      const sid = crypto.randomUUID();
-      const zIdx = strokes.length;
-      const s = { id: sid, tool:'image', shape:{x,y,width:w,height:h}, imgData:ev.target.result, zIdx, userId: me?.userId, _img: img, _loaded: true };
-      strokes.push(s);
-      strokes.sort((a,b)=>(a.zIdx||0)-(b.zIdx||0));
-      socket?.emit('image-add', { strokeId: sid, x, y, width: w, height: h, imageData: ev.target.result, zIndex: zIdx });
-      redraw();
+// ════ IMAGE ════
+function loadImg(e){
+  const file=e.target.files[0];if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const img=new Image();
+    img.onload=()=>{
+      let w=img.width,h=img.height;
+      if(w>imgMaxW){h=h*imgMaxW/w;w=imgMaxW}if(h>imgMaxH){w=w*imgMaxH/h;h=imgMaxH}
+      const cx=(mainC.width/2-panX)/scale, cy=(mainC.height/2-panY)/scale;
+      const x=cx-w/2,y=cy-h/2;
+      const sid=crypto.randomUUID(),zIdx=curStrokes().length;
+      curPage()?.strokes.push({id:sid,tool:'image',shape:{x,y,width:w,height:h},imgData:ev.target.result,zIdx,userId:me?.userId,_img:img,_loaded:true});
+      curPage()?.strokes.sort((a,b)=>(a.zIdx||0)-(b.zIdx||0));
+      socket?.emit('image-add',{strokeId:sid,x,y,width:w,height:h,imageData:ev.target.result,zIndex:zIdx});
+      redraw();updateThumb(currentPageIdx);
     };
-    img.src = ev.target.result;
+    img.src=ev.target.result;
   };
-  reader.readAsDataURL(file); e.target.value = '';
+  reader.readAsDataURL(file);e.target.value='';
 }
 
-// ════════════════════════════════════════════════════
-// STICKY NOTES
-// ════════════════════════════════════════════════════
-const NOTE_COLS = ['#fef08a','#bbf7d0','#bfdbfe','#fecaca','#e9d5ff','#fed7aa'];
-
-function addNote() {
-  const sid = crypto.randomUUID();
-  const wrap = document.getElementById('wrap');
-  const x = (wrap.clientWidth/2 - panX)/scale - 100 + Math.random()*80;
-  const y = (wrap.clientHeight/2 - panY)/scale - 75 + Math.random()*80;
-  const bg = NOTE_COLS[Math.floor(Math.random()*NOTE_COLS.length)];
-  createNoteEl(sid, x, y, '', bg);
-  socket?.emit('note-add', { noteId: sid, x, y, content:'', bgColor: bg, width:200, height:150 });
-}
-
-function createNoteEl(nid, wx, wy, content, bg) {
-  const el = document.createElement('div');
-  el.className = 'snote';
-  el.dataset.nid = nid;
-
-  // World koordinatadan screen ga
-  const sx2 = wx * scale + panX;
-  const sy2 = wy * scale + panY;
-  el.style.cssText = `left:${sx2}px;top:${sy2}px;background:${bg||'#fef08a'};width:200px;height:150px;pointer-events:all;`;
-
-  const hdr = document.createElement('div');
-  hdr.className = 'snote-hdr';
-  const cols = document.createElement('div');
-  cols.className = 'snote-colors';
-  NOTE_COLS.forEach(c => {
-    const d = document.createElement('div');
-    d.className = 'snote-dot'; d.style.background = c;
-    d.onclick = () => el.style.background = c;
-    cols.appendChild(d);
-  });
-  const del = document.createElement('button');
-  del.className = 'snote-del'; del.textContent = '×';
-  del.onclick = () => { el.remove(); socket?.emit('note-delete', { noteId: nid }); };
-  hdr.appendChild(cols); hdr.appendChild(del);
-
-  const ta = document.createElement('textarea');
-  ta.value = content || ''; ta.placeholder = 'Yozing...';
-  let t;
-  ta.addEventListener('input', () => {
-    clearTimeout(t);
-    t = setTimeout(() => {
-      const r = el.getBoundingClientRect();
-      const wr = document.getElementById('wrap').getBoundingClientRect();
-      const wxNew = (r.left - wr.left - panX) / scale;
-      const wyNew = (r.top - wr.top - panY) / scale;
-      socket?.emit('note-update', { noteId: nid, content: ta.value, x: wxNew, y: wyNew });
-    }, 500);
-  });
-
-  el.appendChild(hdr); el.appendChild(ta);
-  document.getElementById('notes-layer').appendChild(el);
-  makeDrag(el, nid);
-}
-
-function makeDrag(el, nid) {
-  let ox, oy, drag = false;
-  el.addEventListener('mousedown', e => {
-    if (e.target.tagName==='TEXTAREA'||e.target.tagName==='BUTTON'||e.target.className==='snote-dot') return;
-    drag = true; ox = e.clientX - el.offsetLeft; oy = e.clientY - el.offsetTop;
-    el.style.zIndex = 400;
-  });
-  document.addEventListener('mousemove', e => { if(!drag) return; el.style.left=(e.clientX-ox)+'px'; el.style.top=(e.clientY-oy)+'px'; });
-  document.addEventListener('mouseup', () => {
-    if (!drag) return; drag = false;
-    const r = el.getBoundingClientRect();
-    const wr = document.getElementById('wrap').getBoundingClientRect();
-    const wx = (r.left - wr.left - panX) / scale;
-    const wy = (r.top - wr.top - panY) / scale;
-    socket?.emit('note-update', { noteId: nid, content: el.querySelector('textarea')?.value||'', x: wx, y: wy });
-  });
-}
-
-// ════════════════════════════════════════════════════
-// CHAT
-// ════════════════════════════════════════════════════
-function toggleChat() {
-  chatOpen = !chatOpen;
-  document.getElementById('chat-panel').classList.toggle('open', chatOpen);
-  document.getElementById('chat-btn').classList.toggle('on', chatOpen);
-  if (chatOpen) { unreadCount = 0; updateBadge(); document.getElementById('chat-input').focus(); }
-}
-
-function sendChat() {
-  const inp = document.getElementById('chat-input');
-  const text = inp.value.trim();
-  if (!text || !socket) return;
-  socket.emit('chat-message', { text });
-  inp.value = '';
-}
-
-document.getElementById('chat-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
-});
-
-function appendMsg(msg, scroll = true) {
-  const isMine = msg.userId === me?.userId;
-  const div = document.createElement('div');
-  div.className = 'cmsg' + (isMine ? ' mine' : '');
-
-  const time = new Date(msg.createdAt).toLocaleTimeString('uz', { hour:'2-digit', minute:'2-digit' });
-  div.innerHTML = `
-    <div class="cmsg-meta">
-      <div class="cmsg-dot" style="background:${msg.color}"></div>
-      <span class="cmsg-name">${msg.name}</span>
-      <span class="cmsg-time">${time}</span>
-    </div>
-    <div class="cmsg-text">${escHtml(msg.text)}</div>
-  `;
-
-  document.getElementById('chat-msgs').appendChild(div);
-  if (scroll) document.getElementById('chat-msgs').scrollTop = 99999;
-
-  if (!chatOpen && !isMine) { unreadCount++; updateBadge(); }
-}
-
-function updateBadge() {
-  const b = document.getElementById('chat-badge');
-  b.textContent = unreadCount > 9 ? '9+' : unreadCount;
-  b.classList.toggle('show', unreadCount > 0 && !chatOpen);
-}
-
-function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
-
-// ════════════════════════════════════════════════════
-// REACTIONS
-// ════════════════════════════════════════════════════
-function toggleReactionPicker() {
-  const p = document.getElementById('reaction-picker');
-  p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
-}
-
-function sendReaction(emoji) {
-  const wrap = document.getElementById('wrap');
-  const x = wrap.clientWidth/2 + (Math.random()-0.5)*200;
-  const y = wrap.clientHeight/2 + (Math.random()-0.5)*100;
-  showReaction(x, y, emoji);
-  socket?.emit('reaction', { emoji, x, y });
-  document.getElementById('reaction-picker').style.display = 'none';
-}
-
-function showReaction(x, y, emoji) {
-  const el = document.createElement('div');
-  el.className = 'reaction-float';
-  el.textContent = emoji;
-  el.style.left = x + 'px';
-  el.style.top = y + 'px';
-  document.getElementById('reactions-layer').appendChild(el);
-  setTimeout(() => el.remove(), 2600);
-}
-
-document.addEventListener('click', e => {
-  if (!e.target.closest('#reaction-picker') && !e.target.closest('.tb[data-tip="Reaktsiya"]')) {
-    document.getElementById('reaction-picker').style.display = 'none';
+// ════ TABLE ════
+function addTable(){
+  const tbl=document.createElement('div');tbl.className='wb-table';
+  const wrap=document.getElementById('canvas-inner');
+  const cx=mainC.width/2-100,cy=mainC.height/2-60;
+  tbl.style.cssText=`left:${cx}px;top:${cy}px`;
+  const rows=4,cols=3;
+  const hdr=document.createElement('div');hdr.className='wb-table-hdr';
+  const ttl=document.createElement('span');ttl.className='wb-table-title';ttl.textContent='Jadval';
+  const btns=document.createElement('div');btns.className='wb-table-btns';
+  const addRow=document.createElement('button');addRow.className='wb-table-btn';addRow.textContent='+R';addRow.title='Qator qo\'shish';
+  const addCol=document.createElement('button');addCol.className='wb-table-btn';addCol.textContent='+C';addCol.title='Ustun qo\'shish';
+  const del=document.createElement('button');del.className='wb-table-btn';del.textContent='✕';del.style.color='var(--accent2)';del.title='O\'chirish';
+  del.onclick=()=>tbl.remove();
+  btns.append(addRow,addCol,del);hdr.append(ttl,btns);tbl.appendChild(hdr);
+  const table=document.createElement('table');
+  function buildTable(r,c){
+    table.innerHTML='';
+    for(let i=0;i<r;i++){
+      const tr=document.createElement('tr');
+      if(i===0) tr.className='th-row';
+      for(let j=0;j<c;j++){
+        const td=document.createElement('td');
+        const inp=document.createElement('input');
+        inp.placeholder=i===0?`Ustun ${j+1}`:'';
+        td.appendChild(inp);tr.appendChild(td);
+      }
+      table.appendChild(tr);
+    }
   }
-});
-
-// ════════════════════════════════════════════════════
-// RENAME
-// ════════════════════════════════════════════════════
-function openRename() {
-  document.getElementById('rename-input').value = me?.name || '';
-  document.getElementById('rename-modal').classList.add('show');
-  document.getElementById('rename-input').focus();
+  let curRows=rows,curCols=cols;
+  buildTable(curRows,curCols);
+  addRow.onclick=()=>{curRows++;buildTable(curRows,curCols)};
+  addCol.onclick=()=>{curCols++;buildTable(curRows,curCols)};
+  tbl.appendChild(table);wrap.appendChild(tbl);
+  // Draggable
+  let ox,oy,drag=false;
+  hdr.addEventListener('mousedown',e=>{drag=true;ox=e.clientX-tbl.offsetLeft;oy=e.clientY-tbl.offsetTop});
+  document.addEventListener('mousemove',e=>{if(!drag) return;tbl.style.left=(e.clientX-ox)+'px';tbl.style.top=(e.clientY-oy)+'px'});
+  document.addEventListener('mouseup',()=>drag=false);
+  toast('Jadval qo\'shildi');
 }
-function closeRename() { document.getElementById('rename-modal').classList.remove('show'); }
-function confirmRename() {
-  const name = document.getElementById('rename-input').value.trim();
-  if (!name) return;
-  if (me) me.name = name;
-  localStorage.setItem('wb-name', name);
-  socket?.emit('rename', { name });
-  closeRename();
-  toast('Ism o\'zgartirildi: ' + name);
-}
-document.getElementById('rename-input').addEventListener('keydown', e => { if(e.key==='Enter') confirmRename(); if(e.key==='Escape') closeRename(); });
 
-// ════════════════════════════════════════════════════
-// EXPORT
-// ════════════════════════════════════════════════════
-function exportPNG() {
-  const tmp = document.createElement('canvas');
-  tmp.width = mainC.width; tmp.height = mainC.height;
-  const tc = tmp.getContext('2d');
-  tc.fillStyle = '#14141e'; tc.fillRect(0,0,tmp.width,tmp.height);
-  tc.drawImage(mainC, 0, 0);
-  const a = document.createElement('a');
-  a.download = `whiteboard-${roomId}-${Date.now()}.png`;
-  a.href = tmp.toDataURL('image/png');
-  a.click();
+// ════ STICKY NOTES ════
+const NCOLS=['#fef08a','#bbf7d0','#bfdbfe','#fecaca','#e9d5ff','#fed7aa'];
+function addNote(){
+  const nid=crypto.randomUUID();
+  const cx=(mainC.width/2-panX)/scale-100+Math.random()*60;
+  const cy=(mainC.height/2-panY)/scale-75+Math.random()*60;
+  const bg=NCOLS[Math.floor(Math.random()*NCOLS.length)];
+  createNoteEl(nid,cx,cy,'',bg);
+  socket?.emit('note-add',{noteId:nid,x:cx,y:cy,content:'',bgColor:bg,width:200,height:150});
+}
+function createNoteEl(nid,wx,wy,content,bg){
+  const el=document.createElement('div');el.className='snote';el.dataset.nid=nid;
+  const sx2=wx*scale+panX,sy2=wy*scale+panY;
+  el.style.cssText=`left:${sx2}px;top:${sy2}px;background:${bg||'#fef08a'};width:200px;height:150px;pointer-events:all`;
+  const hdr=document.createElement('div');hdr.className='snote-hdr';
+  const cols=document.createElement('div');cols.className='snote-cols';
+  NCOLS.forEach(c=>{const d=document.createElement('div');d.className='snote-dot';d.style.background=c;d.onclick=()=>el.style.background=c;cols.appendChild(d)});
+  const del=document.createElement('button');del.className='snote-del';del.textContent='×';del.onclick=()=>{el.remove();socket?.emit('note-delete',{noteId:nid})};
+  hdr.append(cols,del);
+  const ta=document.createElement('textarea');ta.value=content||'';ta.placeholder='Yozing...';
+  let t;ta.addEventListener('input',()=>{clearTimeout(t);t=setTimeout(()=>{const r=el.getBoundingClientRect(),wr=document.getElementById('canvas-inner').getBoundingClientRect();socket?.emit('note-update',{noteId:nid,content:ta.value,x:(r.left-wr.left-panX)/scale,y:(r.top-wr.top-panY)/scale})},500)});
+  el.append(hdr,ta);document.getElementById('notes-layer').appendChild(el);
+  let ox,oy,drag=false;
+  el.addEventListener('mousedown',e=>{if(e.target.tagName==='TEXTAREA'||e.target.tagName==='BUTTON'||e.target.className==='snote-dot') return;drag=true;ox=e.clientX-el.offsetLeft;oy=e.clientY-el.offsetTop;el.style.zIndex=400});
+  document.addEventListener('mousemove',e=>{if(!drag) return;el.style.left=(e.clientX-ox)+'px';el.style.top=(e.clientY-oy)+'px'});
+  document.addEventListener('mouseup',()=>{if(!drag) return;drag=false;const r=el.getBoundingClientRect(),wr=document.getElementById('canvas-inner').getBoundingClientRect();socket?.emit('note-update',{noteId:nid,content:ta?.value||'',x:(r.left-wr.left-panX)/scale,y:(r.top-wr.top-panY)/scale})});
+}
+
+// ════ CHAT ════
+function toggleChat(){chatOpen=!chatOpen;document.getElementById('chat-panel').classList.toggle('open',chatOpen);document.getElementById('chat-btn').classList.toggle('on',chatOpen);if(chatOpen){unreadCount=0;updateBadge();document.getElementById('chat-inp').focus()}}
+function sendChat(){const inp=document.getElementById('chat-inp');const text=inp.value.trim();if(!text||!socket) return;socket.emit('chat-message',{text});inp.value=''}
+document.getElementById('chat-inp').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat()}});
+function appendMsg(msg,scroll=true){
+  const isMine=msg.userId===me?.userId;
+  const div=document.createElement('div');div.className='cmsg'+(isMine?' mine':'');
+  const time=new Date(msg.createdAt).toLocaleTimeString('uz',{hour:'2-digit',minute:'2-digit'});
+  div.innerHTML=`<div class="cmsg-meta"><div class="cmsg-dot" style="background:${msg.color}"></div><span class="cmsg-name">${msg.name}</span><span class="cmsg-time">${time}</span></div><div class="cmsg-text">${escH(msg.text)}</div>`;
+  document.getElementById('chat-msgs').appendChild(div);
+  if(scroll) document.getElementById('chat-msgs').scrollTop=99999;
+  if(!chatOpen&&!isMine){unreadCount++;updateBadge()}
+}
+function updateBadge(){const b=document.getElementById('chat-badge');b.textContent=unreadCount>9?'9+':unreadCount;b.classList.toggle('show',unreadCount>0&&!chatOpen)}
+function escH(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}
+
+// ════ REACTIONS ════
+function toggleRPicker(){const p=document.getElementById('rpicker');p.style.display=p.style.display==='flex'?'none':'flex'}
+function sendReaction(emoji){
+  const w=document.getElementById('canvas-inner');
+  const x=w.clientWidth/2+(Math.random()-.5)*200,y=w.clientHeight/2+(Math.random()-.5)*100;
+  showReaction(x,y,emoji);socket?.emit('reaction',{emoji,x,y});
+  document.getElementById('rpicker').style.display='none';
+}
+function showReaction(x,y,emoji){const el=document.createElement('div');el.className='rfloat';el.textContent=emoji;el.style.left=x+'px';el.style.top=y+'px';document.getElementById('reactions-layer').appendChild(el);setTimeout(()=>el.remove(),2600)}
+document.addEventListener('click',e=>{if(!e.target.closest('#rpicker')&&!e.target.closest('[data-tip="Reaktsiya"]')) document.getElementById('rpicker').style.display='none'});
+
+// ════ RENAME ════
+function openRename(){document.getElementById('rename-inp').value=me?.name||'';document.getElementById('rename-modal').classList.add('show');document.getElementById('rename-inp').focus()}
+function closeRename(){document.getElementById('rename-modal').classList.remove('show')}
+function confirmRename(){const name=document.getElementById('rename-inp').value.trim();if(!name) return;if(me) me.name=name;localStorage.setItem('wb-name',name);socket?.emit('rename',{name});closeRename();toast('Ism o\'zgartirildi: '+name)}
+document.getElementById('rename-inp').addEventListener('keydown',e=>{if(e.key==='Enter') confirmRename();if(e.key==='Escape') closeRename()});
+
+// ════ CONTEXT MENU ════
+function onCtx(e){
+  e.preventDefault();const world=toWorld(e.clientX,e.clientY);
+  const hit=hitTest(world.x,world.y);
+  const has=!!hit;if(has){selectedId=hit.id;redraw()}
+  ['ctx-front','ctx-back','ctx-del'].forEach(id=>document.getElementById(id).style.display=has?'flex':'none');
+  document.getElementById('ctx-sep2').style.display=has?'block':'none';
+  const m=document.getElementById('ctx');m.style.display='block';m.style.left=e.clientX+'px';m.style.top=e.clientY+'px';
+}
+function hideCtx(){document.getElementById('ctx').style.display='none'}
+function ctxUndo(){undo();hideCtx()}function ctxRedo(){redo();hideCtx()}
+document.addEventListener('click',e=>{if(!e.target.closest('#ctx')) hideCtx()});
+
+// ════ EXPORT ════
+function exportPNG(){
+  const pg=curPage();const pd=paperDims(pg||{paperSize:'A4',orient:'portrait'});
+  const tmp=document.createElement('canvas');tmp.width=pd.w;tmp.height=pd.h;
+  const tc=tmp.getContext('2d');
+  const isLight=document.documentElement.classList.contains('light');
+  tc.fillStyle=isLight?'#fff':'#1c1c28';tc.fillRect(0,0,pd.w,pd.h);
+  curStrokes().forEach(s=>drawStroke(tc,s));
+  const a=document.createElement('a');a.download=`whiteboard-p${currentPageIdx+1}-${Date.now()}.png`;a.href=tmp.toDataURL('image/png');a.click();
   toast('PNG yuklandi!');
 }
 
-function exportPDF() {
-  try {
-    const { jsPDF } = window.jspdf;
-    const tmp = document.createElement('canvas');
-    tmp.width = mainC.width; tmp.height = mainC.height;
-    const tc = tmp.getContext('2d');
-    tc.fillStyle = '#ffffff'; tc.fillRect(0,0,tmp.width,tmp.height);
-    // Oq fon uchun qayta chizish
-    tc.save(); tc.translate(panX,panY); tc.scale(scale,scale);
-    strokes.forEach(s => {
-      if(s.tool !== 'eraser') drawStroke(tc, s);
-    });
-    tc.restore();
-
-    const imgData = tmp.toDataURL('image/jpeg', 0.95);
-    const pdf = new jsPDF({
-      orientation: tmp.width > tmp.height ? 'landscape' : 'portrait',
-      unit: 'px',
-      format: [tmp.width, tmp.height],
-    });
-    pdf.addImage(imgData, 'JPEG', 0, 0, tmp.width, tmp.height);
+async function exportPDF(){
+  try{
+    const{jsPDF}=window.jspdf;
+    const pg=curPage()||{paperSize:'A4',orient:'portrait',strokes:[]};
+    const pd=paperDims(pg);
+    const pdf=new jsPDF({orientation:pd.w>pd.h?'landscape':'portrait',unit:'px',format:[pd.w,pd.h]});
+    for(let i=0;i<pages.length;i++){
+      if(i>0) pdf.addPage([pd.w,pd.h],pd.w>pd.h?'landscape':'portrait');
+      const tmp=document.createElement('canvas');tmp.width=pd.w;tmp.height=pd.h;
+      const tc=tmp.getContext('2d');
+      const isLight=document.documentElement.classList.contains('light');
+      tc.fillStyle=isLight?'#fff':'#1c1c28';tc.fillRect(0,0,pd.w,pd.h);
+      pages[i].strokes.forEach(s=>drawStroke(tc,s));
+      pdf.addImage(tmp.toDataURL('image/jpeg',.95),'JPEG',0,0,pd.w,pd.h);
+    }
     pdf.save(`whiteboard-${roomId}-${Date.now()}.pdf`);
-    toast('PDF yuklandi!');
-  } catch(e) {
-    console.error('PDF error:', e);
-    toast('PDF xatosi — PNG ishlatib ko\'ring');
-  }
+    toast(`PDF yuklandi (${pages.length} varoq)!`);
+  }catch(e){console.error(e);toast('PNG ishlatib ko\'ring')}
 }
 
-// ════════════════════════════════════════════════════
-// USERS & CURSORS
-// ════════════════════════════════════════════════════
-function addAvatar({ userId, name, color: c }) {
-  onlineUsers[userId] = { name, color: c };
-  if (document.querySelector(`[data-uid="${userId}"]`)) return;
-  const el = document.createElement('div');
-  el.className = 'uav'; el.dataset.uid = userId;
-  el.style.background = c; el.textContent = name[0].toUpperCase();
-  el.title = name; el.onclick = () => openRename();
+// ════ THEME ════
+function toggleTheme(){
+  document.documentElement.classList.toggle('light');
+  localStorage.setItem('wb-theme',document.documentElement.classList.contains('light')?'light':'dark');
+  redraw();renderPageThumbs();
+}
+// Saved theme
+if(localStorage.getItem('wb-theme')==='light') document.documentElement.classList.add('light');
+
+// ════ FULLSCREEN ════
+function toggleFullscreen(){
+  if(!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+  else document.exitFullscreen?.();
+}
+document.addEventListener('fullscreenchange',()=>{
+  const btn=document.querySelector('[data-tip="To\'liq ekran (F)"]');
+  if(btn) btn.classList.toggle('on',!!document.fullscreenElement);
+  setTimeout(resizeCanvas,100);
+});
+
+// ════ SHORTCUTS MODAL ════
+function showShortcuts(){document.getElementById('shortcuts-modal').classList.add('show')}
+function closeShortcuts(){document.getElementById('shortcuts-modal').classList.remove('show')}
+document.getElementById('shortcuts-modal').addEventListener('click',e=>{if(e.target===e.currentTarget) closeShortcuts()});
+
+// ════ USERS ════
+function addAvatar({userId,name,color:c}){
+  onlineUsers[userId]={name,color:c};
+  if(document.querySelector(`[data-uid="${userId}"]`)) return;
+  const el=document.createElement('div');el.className='uav';el.dataset.uid=userId;el.style.background=c;el.textContent=name[0].toUpperCase();el.title=name;el.onclick=openRename;
   document.getElementById('avatar-list').appendChild(el);
 }
-
-function removeAvatar(uid) {
-  const el = document.querySelector(`[data-uid="${uid}"]`);
-  if (el) el.remove(); delete onlineUsers[uid];
+function removeAvatar(uid){const el=document.querySelector(`[data-uid="${uid}"]`);if(el)el.remove();delete onlineUsers[uid]}
+function updateCursor({userId,name,color:c,x,y}){
+  const sx2=x*scale+panX,sy2=y*scale+panY;
+  let el=remoteCursors[userId];
+  if(!el){el=document.createElement('div');el.className='rcursor';el.innerHTML=`<svg width="16" height="20" viewBox="0 0 16 20"><path d="M0 0L0 14L4 11L6 16L9 15L7 10L12 10Z" fill="${c}" stroke="rgba(0,0,0,.4)" stroke-width="1"/></svg><div class="rcursor-label" style="background:${c}">${name}</div>`;document.getElementById('cursors-layer').appendChild(el);remoteCursors[userId]=el}
+  el.style.left=sx2+'px';el.style.top=sy2+'px';
 }
+function removeCursor(uid){if(remoteCursors[uid]){remoteCursors[uid].remove();delete remoteCursors[uid]}}
 
-function updateAvatarTip(uid, name) {
-  const el = document.querySelector(`[data-uid="${uid}"]`);
-  if (el) el.title = name;
-}
-
-function updateCursor({ userId, name, color: c, x, y }) {
-  // World dan screen ga
-  const sx2 = x * scale + panX;
-  const sy2 = y * scale + panY;
-  let el = remoteCursors[userId];
-  if (!el) {
-    el = document.createElement('div');
-    el.className = 'rcursor';
-    el.innerHTML = `<svg width="18" height="22" viewBox="0 0 18 22"><path d="M0 0L0 16L4.5 12L7 18L10 17L7.5 11L13 11Z" fill="${c}" stroke="rgba(0,0,0,.4)" stroke-width="1"/></svg><div class="rcursor-label" style="background:${c}">${name}</div>`;
-    document.getElementById('cursors-layer').appendChild(el);
-    remoteCursors[userId] = el;
-  }
-  el.style.left = sx2 + 'px';
-  el.style.top = sy2 + 'px';
-}
-
-function removeCursor(uid) { if(remoteCursors[uid]){remoteCursors[uid].remove();delete remoteCursors[uid];} }
-
-// ════════════════════════════════════════════════════
-// UTILS
-// ════════════════════════════════════════════════════
-function copyLink() {
-  const url = `${location.origin}${location.pathname}?room=${roomId}`;
-  navigator.clipboard.writeText(url).then(() => toast('🔗 Link nusxalandi!'));
-}
-
-function toast(msg, dur=2500) {
-  const el = document.getElementById('toast');
-  el.textContent = msg; el.classList.add('show');
-  clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.remove('show'), dur);
-}
+// ════ UTILS ════
+function copyLink(){const url=`${location.origin}${location.pathname}?room=${roomId}`;navigator.clipboard.writeText(url).then(()=>toast('🔗 Link nusxalandi!'))}
+function toast(msg,dur=2500){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),dur)}
 </script>
 </body>
 </html>
