@@ -659,7 +659,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);tou
 
 <script>
 // ════ CONFIG ════
-const SERVER_URL = 'https://Dekuboard-backend-jeh6.onrender.com';
+const SERVER_URL = 'https://whiteboard-backend-jeh6.onrender.com';
 
 // ════ PAPER SIZES ════
 const PAPER_SIZES = {
@@ -1787,7 +1787,7 @@ async function exportPDF(){
       pages[i].strokes.forEach(s=>drawStroke(tc,s));
       pdf.addImage(tmp.toDataURL('image/jpeg',.92),'JPEG',0,0,pd.w,pd.h);
     }
-    const filename=`Dekuboard-${roomId}-${Date.now()}.pdf`;
+    const filename=`dekuboard-${roomId}-${Date.now()}.pdf`;
     const blob=pdf.output('blob');
 
     // Mobil: Web Share API
