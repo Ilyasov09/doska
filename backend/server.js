@@ -21,12 +21,21 @@ const io = new Server(server, {
 app.use(cors({ origin: CLIENT_URL }));
 app.use(express.json({ limit: '10mb' }));
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── State ────────────────────────────────────────────────────────────────────
 const USER_NAMES = ['Alex','Sam','Jordan','Taylor','Morgan','Casey','Riley','Avery','Quinn','Blake'];
 const USER_COLORS = ['#6c63ff','#ff6584','#43e97b','#f9c74f','#48cae4','#ff9f1c','#ef233c','#a8dadc','#e9c46a','#f4a261'];
-const onlineUsers = new Map();
+const onlineUsers = new Map(); // socketId -> user
+
+// Lock tizimi: roomId -> Map(strokeId -> { userId, socketId, ts })
+const roomLocks = new Map();
+
+function getLocks(roomId) {
+  if (!roomLocks.has(roomId)) roomLocks.set(roomId, new Map());
+  return roomLocks.get(roomId);
+}
 
 function getRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
 function genRoomId() {
   const c = 'abcdefghijklmnopqrstuvwxyz0123456789';
   return Array.from({length:8}, () => c[Math.floor(Math.random()*c.length)]).join('');
@@ -38,7 +47,24 @@ async function logActivity(roomId, user, action, detail='') {
       `INSERT INTO activity_log (room_id, user_id, user_name, user_color, action, detail) VALUES ($1,$2,$3,$4,$5,$6)`,
       [roomId, user.userId, user.name, user.color, action, detail]
     );
-  } catch(e) { /* log xatosi asosiy jarayonni to'xtatmasin */ }
+  } catch(e) {}
+}
+
+// Foydalanuvchi disconnect bo'lganda uning barcha lock larini ozod qilish
+function releaseUserLocks(socketId) {
+  const user = onlineUsers.get(socketId);
+  if (!user) return;
+  const locks = getLocks(user.roomId);
+  const released = [];
+  for (const [strokeId, lock] of locks) {
+    if (lock.socketId === socketId) {
+      locks.delete(strokeId);
+      released.push(strokeId);
+    }
+  }
+  if (released.length > 0) {
+    io.to(user.roomId).emit('strokes-unlocked', { strokeIds: released });
+  }
 }
 
 // ─── REST API ─────────────────────────────────────────────────────────────────
@@ -49,10 +75,10 @@ app.post('/api/rooms', async (req, res) => {
     const { name, password } = req.body;
     const roomId = genRoomId();
     const passwordHash = password?.trim() ? await bcrypt.hash(password.trim(), 10) : null;
-    await pool.query('INSERT INTO rooms (id, name, password_hash) VALUES ($1, $2, $3)', [roomId, name || `Xona ${roomId}`, passwordHash]);
+    await pool.query('INSERT INTO rooms (id, name, password_hash) VALUES ($1, $2, $3)',
+      [roomId, name || `Xona ${roomId}`, passwordHash]);
     res.json({ roomId, hasPassword: !!passwordHash });
   } catch (err) {
-    console.error('Create room error:', err);
     res.status(500).json({ error: 'Xona yaratib bo\'lmadi' });
   }
 });
@@ -96,7 +122,6 @@ app.get('/api/rooms/:roomId/data', async (req, res) => {
   }
 });
 
-// Xona tarixi
 app.get('/api/rooms/:roomId/activity', async (req, res) => {
   try {
     const { roomId } = req.params;
@@ -113,7 +138,6 @@ app.get('/api/rooms/:roomId/activity', async (req, res) => {
 
 // ─── SOCKET.IO ────────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
-  console.log(`🔌 Connected: ${socket.id}`);
 
   socket.on('join-room', async ({ roomId, userId, preferredName }) => {
     try {
@@ -132,12 +156,20 @@ io.on('connection', (socket) => {
         if (u.roomId === roomId && u.socketId !== socket.id)
           roomUsers.push({ userId: u.userId, name: u.name, color: u.color });
       }
-      socket.emit('joined', { user: { userId: user.userId, name: user.name, color: user.color }, onlineUsers: roomUsers });
-      // Tarixga yozish
+      // Mavjud lock larni ham yuborish
+      const locks = getLocks(roomId);
+      const activeLocks = {};
+      for (const [strokeId, lock] of locks) {
+        activeLocks[strokeId] = { userId: lock.userId, color: lock.color };
+      }
+      socket.emit('joined', {
+        user: { userId: user.userId, name: user.name, color: user.color },
+        onlineUsers: roomUsers,
+        activeLocks,
+      });
       logActivity(roomId, user, 'join', `${user.name} xonaga kirdi`);
       io.to(roomId).emit('activity', { userId: user.userId, name: user.name, color: user.color, action: 'join', detail: `${user.name} xonaga kirdi`, createdAt: new Date().toISOString() });
     } catch (err) {
-      console.error('Join error:', err);
       socket.emit('error', { message: 'Xonaga kira olmadingiz' });
     }
   });
@@ -152,7 +184,7 @@ io.on('connection', (socket) => {
     io.to(user.roomId).emit('activity', { userId: user.userId, name: user.name, color: user.color, action: 'rename', detail: `Ism o'zgardi: ${oldName} → ${user.name}`, createdAt: new Date().toISOString() });
   });
 
-  // ── Stroke events ──────────────────────────────────────────────────────────
+  // ── Stroke drawing ─────────────────────────────────────────────────────────
   socket.on('stroke-start', (data) => {
     const user = onlineUsers.get(socket.id);
     if (!user) return;
@@ -165,7 +197,6 @@ io.on('connection', (socket) => {
     socket.to(user.roomId).emit('stroke-point', { ...data, userId: user.userId });
   });
 
-  // Batch points (performance uchun)
   socket.on('stroke-batch', (data) => {
     const user = onlineUsers.get(socket.id);
     if (!user) return;
@@ -186,25 +217,86 @@ io.on('connection', (socket) => {
       );
       socket.to(user.roomId).emit('stroke-end', { ...data, userId: user.userId });
       pool.query('UPDATE rooms SET last_active = NOW() WHERE id = $1', [user.roomId]);
-
-      // Tool ga qarab tarix
-      const toolNames = { pen: 'Chizdi', eraser: 'O\'chirdi', line: 'Chiziq', rect: 'To\'rtburchak', circle: 'Doira', triangle: 'Uchburchak', arrow: 'O\'q', text: 'Matn yozdi', image: 'Rasm qo\'shdi' };
+      const toolNames = { pen:'Chizdi', eraser:'O\'chirdi', line:'Chiziq', rect:'To\'rtburchak', circle:'Doira', triangle:'Uchburchak', arrow:'O\'q', text:'Matn yozdi', image:'Rasm qo\'shdi' };
       const detail = toolNames[tool] || tool;
       logActivity(user.roomId, user, 'draw', detail);
       io.to(user.roomId).emit('activity', { userId: user.userId, name: user.name, color: user.color, action: 'draw', detail, createdAt: new Date().toISOString() });
     } catch (err) { console.error('Stroke save error:', err); }
   });
 
+  // ── LOCK TIZIMI ────────────────────────────────────────────────────────────
+  socket.on('stroke-lock', ({ strokeId }) => {
+    const user = onlineUsers.get(socket.id);
+    if (!user || !strokeId) return;
+    const locks = getLocks(user.roomId);
+
+    // Agar allaqachon boshqa kishi ushlab tursa — rad etish
+    if (locks.has(strokeId)) {
+      const existing = locks.get(strokeId);
+      if (existing.socketId !== socket.id) {
+        socket.emit('stroke-lock-denied', { strokeId, lockedBy: existing.userId, lockedByColor: existing.color });
+        return;
+      }
+    }
+
+    // Lock berish
+    locks.set(strokeId, {
+      userId: user.userId,
+      socketId: socket.id,
+      color: user.color,
+      name: user.name,
+      ts: Date.now(),
+    });
+
+    // Hammaga xabar berish
+    io.to(user.roomId).emit('stroke-locked', {
+      strokeId,
+      userId: user.userId,
+      color: user.color,
+      name: user.name,
+    });
+  });
+
+  socket.on('stroke-unlock', ({ strokeId, newPoints, newShapeData }) => {
+    const user = onlineUsers.get(socket.id);
+    if (!user || !strokeId) return;
+    const locks = getLocks(user.roomId);
+    const lock = locks.get(strokeId);
+
+    // Faqat lock egasi ozod qila oladi
+    if (!lock || lock.socketId !== socket.id) return;
+
+    locks.delete(strokeId);
+
+    // Final pozitsiyani serverga saqlash
+    if (newPoints !== undefined || newShapeData !== undefined) {
+      pool.query(
+        `UPDATE strokes SET points=$1, shape_data=$2 WHERE id=$3 AND room_id=$4`,
+        [JSON.stringify(newPoints || []), JSON.stringify(newShapeData || null), strokeId, user.roomId]
+      ).catch(err => console.error('Stroke unlock save error:', err));
+    }
+
+    // Hammaga unlock xabari + final pozitsiya
+    io.to(user.roomId).emit('stroke-unlocked', {
+      strokeId,
+      userId: user.userId,
+      newPoints,
+      newShapeData,
+    });
+  });
+
+  // Real-time harakat (lock egaliga tekshirib)
   socket.on('stroke-move', async (data) => {
     const user = onlineUsers.get(socket.id);
     if (!user) return;
-    try {
-      await pool.query(
-        `UPDATE strokes SET points=$1, shape_data=$2 WHERE id=$3 AND room_id=$4`,
-        [JSON.stringify(data.newPoints || []), JSON.stringify(data.newShapeData || null), data.strokeId, user.roomId]
-      );
-      socket.to(user.roomId).emit('stroke-move', { ...data, userId: user.userId });
-    } catch (err) { console.error('Stroke move error:', err); }
+    const locks = getLocks(user.roomId);
+    const lock = locks.get(data.strokeId);
+
+    // Faqat lock egasi harakatlatishi mumkin
+    if (!lock || lock.socketId !== socket.id) return;
+
+    // Boshqalarga real-time broadcast (DB ga emas, faqat RAM)
+    socket.to(user.roomId).emit('stroke-move', { ...data, userId: user.userId });
   });
 
   socket.on('stroke-zindex', async ({ strokeId, zIndex }) => {
@@ -216,6 +308,7 @@ io.on('connection', (socket) => {
     } catch (err) { console.error('Z-index error:', err); }
   });
 
+  // ── Image ──────────────────────────────────────────────────────────────────
   socket.on('image-add', async (data) => {
     const user = onlineUsers.get(socket.id);
     if (!user) return;
@@ -234,19 +327,22 @@ io.on('connection', (socket) => {
     } catch (err) { console.error('Image save error:', err); }
   });
 
+  // Image resize ham lock orqali
   socket.on('image-resize', async (data) => {
     const user = onlineUsers.get(socket.id);
     if (!user) return;
-    try {
-      await pool.query(
-        `UPDATE strokes SET shape_data=$1 WHERE id=$2 AND room_id=$3`,
-        [JSON.stringify({ x: data.x, y: data.y, width: data.width, height: data.height }), data.strokeId, user.roomId]
-      );
-      socket.to(user.roomId).emit('image-resize', { ...data, userId: user.userId });
-    } catch (err) { console.error('Image resize error:', err); }
+    const locks = getLocks(user.roomId);
+    const lock = locks.get(data.strokeId);
+
+    // Faqat lock egasi resize qila oladi
+    if (!lock || lock.socketId !== socket.id) return;
+
+    // Real-time broadcast
+    socket.to(user.roomId).emit('image-resize', { ...data, userId: user.userId });
+    // DB ga saqlash — faqat unlock da yoki throttle bilan
   });
 
-  // ── Sticky Notes ───────────────────────────────────────────────────────────
+  // ── Notes ──────────────────────────────────────────────────────────────────
   socket.on('note-add', async (data) => {
     const user = onlineUsers.get(socket.id);
     if (!user) return;
@@ -254,7 +350,7 @@ io.on('connection', (socket) => {
       const noteId = uuidv4();
       await pool.query(
         `INSERT INTO sticky_notes (id, room_id, user_id, x, y, width, height, content, bg_color) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-        [noteId, user.roomId, user.userId, data.x, data.y, data.width || 200, data.height || 150, data.content || '', data.bgColor || '#fef08a']
+        [noteId, user.roomId, user.userId, data.x, data.y, data.width||200, data.height||150, data.content||'', data.bgColor||'#fef08a']
       );
       socket.to(user.roomId).emit('note-add', { ...data, noteId, userId: user.userId });
       socket.emit('note-saved', { noteId });
@@ -296,20 +392,19 @@ io.on('connection', (socket) => {
         [msgId, user.roomId, user.userId, user.name, user.color, msg.text]
       );
       io.to(user.roomId).emit('chat-message', msg);
-      logActivity(user.roomId, user, 'chat', `"${msg.text.slice(0, 40)}${msg.text.length > 40 ? '...' : ''}"`);
-      io.to(user.roomId).emit('activity', { userId: user.userId, name: user.name, color: user.color, action: 'chat', detail: `Chat: "${msg.text.slice(0, 30)}${msg.text.length > 30 ? '...' : ''}"`, createdAt: new Date().toISOString() });
+      logActivity(user.roomId, user, 'chat', `"${msg.text.slice(0,40)}${msg.text.length>40?'...':''}"`);
+      io.to(user.roomId).emit('activity', { userId: user.userId, name: user.name, color: user.color, action: 'chat', detail: `Chat: "${msg.text.slice(0,30)}${msg.text.length>30?'...':''}"`, createdAt: new Date().toISOString() });
     } catch (err) { console.error('Chat error:', err); }
   });
 
-  // ── Reactions ──────────────────────────────────────────────────────────────
+  // ── Reaction ───────────────────────────────────────────────────────────────
   socket.on('reaction', ({ emoji, x, y }) => {
     const user = onlineUsers.get(socket.id);
     if (!user) return;
-    // Barcha foydalanuvchilarga yuborish (o'ziga ham)
     io.to(user.roomId).emit('reaction', { emoji, x, y, userId: user.userId, name: user.name, color: user.color });
   });
 
-  // ── Varoq nom ──────────────────────────────────────────────────────────────
+  // ── Page rename ────────────────────────────────────────────────────────────
   socket.on('page-rename', ({ pageIdx, name }) => {
     const user = onlineUsers.get(socket.id);
     if (!user) return;
@@ -328,7 +423,10 @@ io.on('connection', (socket) => {
         [user.roomId, user.userId]
       );
       if (result.rows.length > 0) {
-        io.to(user.roomId).emit('stroke-removed', { strokeId: result.rows[0].id });
+        const strokeId = result.rows[0].id;
+        // Lock ham bo'lsa ozod qilish
+        getLocks(user.roomId).delete(strokeId);
+        io.to(user.roomId).emit('stroke-removed', { strokeId });
         logActivity(user.roomId, user, 'undo', 'Bekor qildi');
         io.to(user.roomId).emit('activity', { userId: user.userId, name: user.name, color: user.color, action: 'undo', detail: 'Bekor qildi', createdAt: new Date().toISOString() });
       }
@@ -342,6 +440,8 @@ io.on('connection', (socket) => {
     try {
       await pool.query('DELETE FROM strokes WHERE room_id=$1', [user.roomId]);
       await pool.query('DELETE FROM sticky_notes WHERE room_id=$1', [user.roomId]);
+      // Barcha lock larni tozalash
+      roomLocks.delete(user.roomId);
       io.to(user.roomId).emit('board-cleared');
       logActivity(user.roomId, user, 'clear', 'Hammani tozaladi');
       io.to(user.roomId).emit('activity', { userId: user.userId, name: user.name, color: user.color, action: 'clear', detail: 'Hammani tozaladi', createdAt: new Date().toISOString() });
@@ -357,6 +457,7 @@ io.on('connection', (socket) => {
 
   // ── Disconnect ─────────────────────────────────────────────────────────────
   socket.on('disconnect', () => {
+    releaseUserLocks(socket.id);
     const user = onlineUsers.get(socket.id);
     if (user) {
       socket.to(user.roomId).emit('user-left', { userId: user.userId, name: user.name });
@@ -364,7 +465,6 @@ io.on('connection', (socket) => {
       io.to(user.roomId).emit('activity', { userId: user.userId, name: user.name, color: user.color, action: 'leave', detail: `${user.name} xonani tark etdi`, createdAt: new Date().toISOString() });
       onlineUsers.delete(socket.id);
     }
-    console.log(`🔌 Disconnected: ${socket.id}`);
   });
 });
 
@@ -373,4 +473,16 @@ const PORT = process.env.PORT || 3001;
 initDB().then(() => {
   server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
   setInterval(cleanupOldRooms, 6 * 60 * 60 * 1000);
+  // Eskirgan lock larni tozalash (30 soniyadan eski)
+  setInterval(() => {
+    const now = Date.now();
+    for (const [roomId, locks] of roomLocks) {
+      for (const [strokeId, lock] of locks) {
+        if (now - lock.ts > 30000) {
+          locks.delete(strokeId);
+          io.to(roomId).emit('stroke-unlocked', { strokeId, userId: lock.userId });
+        }
+      }
+    }
+  }, 10000);
 }).catch(err => { console.error('Failed to start:', err); process.exit(1); });
