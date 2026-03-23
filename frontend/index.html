@@ -222,7 +222,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);tou
 /* ══ REACTIONS ══ */
 .rfloat{position:absolute;font-size:32px;pointer-events:none;animation:rfloat 2.5s ease-out forwards;z-index:401}
 @keyframes rfloat{0%{transform:scale(0) translateY(0);opacity:1}20%{transform:scale(1.4) translateY(-10px);opacity:1}100%{transform:scale(.8) translateY(-90px);opacity:0}}
-#rpicker{display:none;position:absolute;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px;gap:4px;flex-wrap:wrap;width:148px;top:38px;right:0;z-index:500;box-shadow:var(--shadow)}
+#rpicker{display:none;position:fixed;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;gap:6px;flex-wrap:wrap;width:160px;z-index:2000;box-shadow:var(--shadow)}
 #rpicker span{font-size:22px;cursor:pointer;transition:.15s;border-radius:6px;padding:3px;display:inline-block}
 #rpicker span:hover{background:var(--border);transform:scale(1.2)}
 
@@ -391,14 +391,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);tou
       <button class="tb" onclick="addTable()">⊞</button>
       <button class="tb" onclick="document.getElementById('img-inp').click()">🖼</button>
       <input type="file" id="img-inp" accept="image/*" style="display:none" onchange="loadImg(event)"/>
-      <button class="tb" onclick="toggleRPicker()" style="position:relative">🎉
-        <div id="rpicker">
-          <span onclick="sendReaction('👍')">👍</span><span onclick="sendReaction('❤️')">❤️</span>
-          <span onclick="sendReaction('🔥')">🔥</span><span onclick="sendReaction('⭐')">⭐</span>
-          <span onclick="sendReaction('😂')">😂</span><span onclick="sendReaction('🎉')">🎉</span>
-          <span onclick="sendReaction('💡')">💡</span><span onclick="sendReaction('✅')">✅</span>
-        </div>
-      </button>
+      <button class="tb" id="reaction-btn" onclick="toggleRPicker(event)">🎉</button>
     </div>
     <div class="tg">
       <button class="tb" onclick="openPSModal()">📐</button>
@@ -506,6 +499,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);tou
       </div>
     </div>
   </div>
+</div>
+
+<!-- Reaction picker (global, fixed) -->
+<div id="rpicker">
+  <span onclick="sendReaction('👍')">👍</span>
+  <span onclick="sendReaction('❤️')">❤️</span>
+  <span onclick="sendReaction('🔥')">🔥</span>
+  <span onclick="sendReaction('😂')">😂</span>
+  <span onclick="sendReaction('🎉')">🎉</span>
+  <span onclick="sendReaction('💡')">💡</span>
 </div>
 
 <!-- Chat panel -->
@@ -1452,17 +1455,30 @@ function appendActivity(data,scroll=true){
 }
 
 // ════ REACTIONS — TO'G'RILANGAN ════
-function toggleRPicker(){
+function toggleRPicker(e){
   const p=document.getElementById('rpicker');
-  p.style.display=p.style.display==='flex'?'none':'flex';
+  const isOpen=p.style.display==='flex';
+  p.style.display=isOpen?'none':'flex';
+  if(!isOpen&&e){
+    // Tugma pozitsiyasiga qarab joylash
+    const btn=document.getElementById('reaction-btn');
+    const rect=btn?btn.getBoundingClientRect():{top:50,left:50,bottom:80};
+    const isMobile=window.innerWidth<=768;
+    if(isMobile){
+      p.style.bottom=(window.innerHeight-rect.top+8)+'px';
+      p.style.left='50%';p.style.transform='translateX(-50%)';p.style.top='auto';
+    } else {
+      p.style.top=(rect.bottom+6)+'px';
+      p.style.left=Math.max(8,rect.left-60)+'px';
+      p.style.transform='none';p.style.bottom='auto';
+    }
+  }
 }
 
 function sendReaction(emoji){
-  // Canvas markazida ko'rsatish
   const wrap=document.getElementById('canvas-inner');
-  const cx=wrap.clientWidth/2+(Math.random()-.5)*200;
-  const cy=wrap.clientHeight/2+(Math.random()-.5)*100;
-  // Screen koordinatadan world ga
+  const cx=wrap.clientWidth/2+(Math.random()-.5)*160;
+  const cy=wrap.clientHeight/2+(Math.random()-.5)*80;
   const worldX=(cx-panX)/scale;const worldY=(cy-panY)/scale;
   showReaction(cx,cy,emoji);
   socket?.emit('reaction',{emoji,x:worldX,y:worldY});
@@ -1477,10 +1493,37 @@ function showReaction(sx,sy,emoji){
 }
 
 document.addEventListener('click',e=>{
-  if(!e.target.closest('#rpicker')&&!e.target.textContent?.includes('🎉')){
+  if(!e.target.closest('#rpicker')&&e.target.id!=='reaction-btn'){
     document.getElementById('rpicker').style.display='none';
   }
 });
+
+// ════ EXPORT — mobil uchun to'g'rilangan ════
+function exportPNG(){
+  const pg=curPage();const pd=paperDims(pg||{paperSize:'A4',orient:'portrait'});
+  const tmp=document.createElement('canvas');tmp.width=pd.w;tmp.height=pd.h;
+  const tc=tmp.getContext('2d');const isLight=document.documentElement.classList.contains('light');
+  tc.fillStyle=isLight?'#fff':'#1c1c28';tc.fillRect(0,0,pd.w,pd.h);
+  curStrokes().forEach(s=>drawStroke(tc,s));
+
+  const filename=`wb-p${currentPageIdx+1}-${Date.now()}.png`;
+
+  // Mobil: Web Share API ishlatish
+  if(navigator.share&&navigator.canShare){
+    tmp.toBlob(async blob=>{
+      const file=new File([blob],filename,{type:'image/png'});
+      if(navigator.canShare({files:[file]})){
+        try{await navigator.share({files:[file],title:'Whiteboard'});return}catch(e){}
+      }
+      // Share ishlamasa oddiy download
+      downloadBlob(blob,filename);
+    },'image/png');
+  } else {
+    // Desktop: oddiy download
+    const a=document.createElement('a');a.download=filename;a.href=tmp.toDataURL('image/png');a.click();
+  }
+  toast('PNG yuklandi!');
+}
 
 // ════ MOBILE PANELS ════
 function toggleMobileMore(){
@@ -1557,8 +1600,26 @@ async function exportPDF(){
       pages[i].strokes.forEach(s=>drawStroke(tc,s));
       pdf.addImage(tmp.toDataURL('image/jpeg',.92),'JPEG',0,0,pd.w,pd.h);
     }
-    pdf.save(`whiteboard-${roomId}-${Date.now()}.pdf`);toast(`PDF yuklandi (${pages.length} varoq)!`);
-  }catch(e){console.error(e);toast('PNG ishlatib ko\'ring')}
+    const filename=`whiteboard-${roomId}-${Date.now()}.pdf`;
+    const blob=pdf.output('blob');
+
+    // Mobil: Web Share API
+    if(navigator.share&&navigator.canShare){
+      const file=new File([blob],filename,{type:'application/pdf'});
+      if(navigator.canShare({files:[file]})){
+        try{await navigator.share({files:[file],title:'Whiteboard PDF'});toast(`PDF (${pages.length} varoq)!`);return}catch(e){}
+      }
+    }
+    // Desktop yoki share ishlamasa
+    downloadBlob(blob,filename);
+    toast(`PDF yuklandi (${pages.length} varoq)!`);
+  }catch(e){console.error(e);toast('Xato — PNG ishlatib ko\'ring')}
+}
+
+function downloadBlob(blob,filename){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=filename;a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
 // ════ THEME & FULLSCREEN ════
