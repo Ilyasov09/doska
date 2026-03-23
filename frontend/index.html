@@ -5,961 +5,1732 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Whiteboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <style>
+/* ══════════════════════════════════════════════
+   RESET & VARIABLES
+══════════════════════════════════════════════ */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0f0f13;
-  --surface:#18181f;
-  --surface2:#222230;
-  --border:#2e2e3e;
-  --accent:#6c63ff;
-  --accent2:#ff6584;
-  --text:#e8e8f0;
-  --text2:#9090a8;
-  --text3:#555568;
+  --bg:#0c0c10;
+  --surface:#15151c;
+  --surface2:#1e1e28;
+  --surface3:#252535;
+  --border:#2a2a3a;
+  --border2:#363648;
+  --accent:#7c6dfa;
+  --accent-dim:rgba(124,109,250,.15);
+  --accent2:#ff6b8a;
+  --text:#e2e2ee;
+  --text2:#8888a8;
+  --text3:#454560;
+  --shadow:0 12px 40px rgba(0,0,0,.6);
   --radius:12px;
-  --shadow:0 8px 32px rgba(0,0,0,.5);
+  --toolbar-h:52px;
 }
-body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow:hidden}
+html,body{height:100%;overflow:hidden}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);user-select:none}
 
+/* ══════════════════════════════════════════════
+   LOBBY
+══════════════════════════════════════════════ */
 #lobby{
   position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
-  background:var(--bg);z-index:1000;transition:opacity .3s;
+  background:var(--bg);z-index:2000;transition:opacity .4s,visibility .4s;
 }
-#lobby.hidden{opacity:0;pointer-events:none;}
+#lobby.out{opacity:0;visibility:hidden;pointer-events:none}
 #lobby::before{
   content:'';position:absolute;inset:0;
-  background:radial-gradient(ellipse 600px 400px at 60% 40%,rgba(108,99,255,.08) 0%,transparent 70%),
-             radial-gradient(ellipse 400px 300px at 20% 70%,rgba(255,101,132,.06) 0%,transparent 60%);
+  background:
+    radial-gradient(ellipse 700px 500px at 65% 35%,rgba(124,109,250,.07) 0%,transparent 70%),
+    radial-gradient(ellipse 500px 400px at 15% 75%,rgba(255,107,138,.05) 0%,transparent 65%);
+  pointer-events:none;
 }
-.lobby-card{
-  position:relative;width:420px;background:var(--surface);border:1px solid var(--border);
-  border-radius:20px;padding:40px;box-shadow:var(--shadow);
+.lcard{
+  position:relative;width:440px;background:var(--surface);
+  border:1px solid var(--border);border-radius:20px;padding:44px;box-shadow:var(--shadow);
 }
-.lobby-logo{
-  font-size:28px;font-weight:600;letter-spacing:-.5px;margin-bottom:8px;
-  background:linear-gradient(135deg,#6c63ff,#ff6584);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+.logo{
+  font-size:26px;font-weight:600;letter-spacing:-.5px;margin-bottom:6px;
+  background:linear-gradient(135deg,#7c6dfa,#ff6b8a);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
 }
-.lobby-sub{font-size:14px;color:var(--text2);margin-bottom:32px}
-.tabs{display:flex;gap:4px;background:var(--bg);border-radius:10px;padding:4px;margin-bottom:24px}
-.tab{
-  flex:1;padding:9px;text-align:center;font-size:13px;font-weight:500;color:var(--text2);
-  border-radius:7px;cursor:pointer;transition:.2s;border:none;background:transparent;
+.logo-sub{font-size:13px;color:var(--text2);margin-bottom:30px}
+.tabs{display:flex;background:var(--bg);border-radius:10px;padding:3px;margin-bottom:22px}
+.tab-btn{
+  flex:1;padding:8px;text-align:center;font-size:13px;font-weight:500;color:var(--text2);
+  border-radius:8px;cursor:pointer;transition:.2s;border:none;background:transparent;font-family:'DM Sans',sans-serif;
 }
-.tab.active{background:var(--surface2);color:var(--text)}
-.form-group{margin-bottom:16px}
-label{display:block;font-size:12px;font-weight:500;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
-input[type=text],input[type=password]{
-  width:100%;padding:12px 14px;background:var(--bg);border:1px solid var(--border);
-  border-radius:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;
+.tab-btn.on{background:var(--surface2);color:var(--text)}
+.tp{display:none}.tp.on{display:block}
+.fg{margin-bottom:14px}
+.fg label{display:block;font-size:11px;font-weight:500;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.6px}
+.fi{
+  width:100%;padding:11px 13px;background:var(--bg);border:1px solid var(--border);
+  border-radius:9px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;
   outline:none;transition:.2s;
 }
-input:focus{border-color:var(--accent)}
+.fi:focus{border-color:var(--accent)}
+.fi-row{display:flex;gap:8px}
+.fi-row .fi{flex:1}
 .btn{
-  width:100%;padding:13px;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;
-  font-size:14px;font-weight:600;cursor:pointer;transition:.2s;
+  width:100%;padding:12px;border:none;border-radius:9px;
+  font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:.2s;
 }
-.btn-primary{background:var(--accent);color:#fff}
-.btn-primary:hover{background:#5a52e0;transform:translateY(-1px)}
-.btn-primary:active{transform:translateY(0)}
-.btn-secondary{background:var(--surface2);color:var(--text);margin-top:8px}
-.btn-secondary:hover{background:var(--border)}
-.error-msg{
-  background:rgba(255,101,132,.1);border:1px solid rgba(255,101,132,.3);
-  color:#ff8fa3;padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:16px;display:none;
+.btn-p{background:var(--accent);color:#fff}
+.btn-p:hover{background:#6a5ce8;transform:translateY(-1px)}
+.btn-p:active{transform:translateY(0)}
+.btn-s{background:var(--surface2);color:var(--text);margin-top:8px}
+.btn-s:hover{background:var(--border)}
+.err{
+  background:rgba(255,107,138,.1);border:1px solid rgba(255,107,138,.25);
+  color:#ff8fa3;padding:10px 13px;border-radius:8px;font-size:13px;
+  margin-bottom:14px;display:none;
 }
-.tab-panel{display:none}
-.tab-panel.active{display:block}
 
-/* App */
+/* ══════════════════════════════════════════════
+   APP SHELL
+══════════════════════════════════════════════ */
 #app{
   position:fixed;inset:0;display:flex;flex-direction:column;
   visibility:hidden;
 }
-#app.visible{visibility:visible}
+#app.on{visibility:visible}
 
+/* ══════════════════════════════════════════════
+   TOOLBAR
+══════════════════════════════════════════════ */
 #toolbar{
-  display:flex;align-items:center;gap:6px;padding:8px 12px;
-  background:var(--surface);border-bottom:1px solid var(--border);
-  flex-wrap:wrap;position:relative;z-index:100;flex-shrink:0;
+  height:var(--toolbar-h);display:flex;align-items:center;gap:4px;
+  padding:0 10px;background:var(--surface);border-bottom:1px solid var(--border);
+  flex-shrink:0;z-index:100;overflow-x:auto;overflow-y:hidden;
 }
-.tool-group{display:flex;align-items:center;gap:3px;padding:0 8px;border-right:1px solid var(--border)}
-.tool-group:last-child{border-right:none}
-.tool-btn{
-  width:34px;height:34px;display:flex;align-items:center;justify-content:center;
-  border:none;background:transparent;color:var(--text2);border-radius:8px;
-  cursor:pointer;transition:.15s;font-size:16px;position:relative;
+#toolbar::-webkit-scrollbar{height:0}
+.tg{display:flex;align-items:center;gap:2px;padding:0 6px;border-right:1px solid var(--border)}
+.tg:last-child{border-right:none;margin-left:auto}
+.tb{
+  width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+  border:none;background:transparent;color:var(--text2);border-radius:7px;
+  cursor:pointer;transition:.15s;font-size:15px;position:relative;flex-shrink:0;
+  font-family:'DM Sans',sans-serif;
 }
-.tool-btn:hover{background:var(--surface2);color:var(--text)}
-.tool-btn.active{background:rgba(108,99,255,.2);color:var(--accent)}
-.tool-btn[title]:hover::after{
-  content:attr(title);position:absolute;bottom:-32px;left:50%;transform:translateX(-50%);
-  background:var(--surface2);color:var(--text);padding:4px 8px;border-radius:6px;
-  font-size:11px;white-space:nowrap;pointer-events:none;z-index:999;border:1px solid var(--border);
+.tb:hover{background:var(--surface2);color:var(--text)}
+.tb.on{background:var(--accent-dim);color:var(--accent)}
+.tb[data-tip]:hover::after{
+  content:attr(data-tip);position:absolute;bottom:-30px;left:50%;transform:translateX(-50%);
+  background:var(--surface2);color:var(--text);padding:3px 7px;border-radius:5px;
+  font-size:11px;white-space:nowrap;z-index:999;border:1px solid var(--border);pointer-events:none;
 }
+.sep{width:1px;height:22px;background:var(--border);margin:0 2px;flex-shrink:0}
 
-input[type=range]{
-  -webkit-appearance:none;height:4px;background:var(--border);border-radius:2px;
-  outline:none;cursor:pointer;width:80px;
+/* Color swatches */
+.csw{
+  width:20px;height:20px;border-radius:50%;cursor:pointer;
+  border:2px solid transparent;transition:.15s;flex-shrink:0;
 }
-input[type=range]::-webkit-slider-thumb{
-  -webkit-appearance:none;width:14px;height:14px;background:var(--accent);
-  border-radius:50%;cursor:pointer;
-}
+.csw:hover,.csw.on{border-color:var(--text);transform:scale(1.2)}
+#color-custom{width:20px;height:20px;padding:0;border:2px solid var(--border);border-radius:50%;cursor:pointer;overflow:hidden;flex-shrink:0}
 
-.color-swatch{
-  width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;
-  transition:.15s;flex-shrink:0;
-}
-.color-swatch.active,.color-swatch:hover{border-color:var(--text);transform:scale(1.15)}
-#custom-color{
-  width:22px;height:22px;padding:0;border:none;border-radius:50%;cursor:pointer;
-  overflow:hidden;
-}
+/* Range */
+.rng{-webkit-appearance:none;height:3px;background:var(--border2);border-radius:2px;outline:none;cursor:pointer;width:72px}
+.rng::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;background:var(--accent);border-radius:50%;cursor:pointer}
+.rlbl{font-size:11px;color:var(--text2);min-width:24px;text-align:center;font-family:'DM Mono',monospace}
 
-#users-panel{
-  display:flex;align-items:center;gap:6px;margin-left:auto;
-}
-.user-avatar{
-  width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  font-size:11px;font-weight:600;color:#fff;border:2px solid var(--bg);margin-left:-6px;
-  cursor:default;
-}
-.user-avatar:first-child{margin-left:0}
-#room-info{
-  font-size:12px;color:var(--text2);background:var(--surface2);
-  padding:5px 10px;border-radius:8px;cursor:pointer;
-  font-family:'DM Mono',monospace;
-}
-#room-info:hover{color:var(--accent)}
+/* Zoom display */
+#zoom-display{font-size:11px;color:var(--text2);font-family:'DM Mono',monospace;min-width:38px;text-align:center;cursor:pointer}
+#zoom-display:hover{color:var(--accent)}
 
-#canvas-wrap{
-  flex:1;position:relative;overflow:hidden;background:#1a1a24;
-  background-image:radial-gradient(circle,rgba(255,255,255,.04) 1px,transparent 1px);
-  background-size:24px 24px;
+/* User avatars */
+.uav{
+  width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:600;color:#fff;border:2px solid var(--bg);
+  margin-left:-5px;cursor:pointer;flex-shrink:0;transition:.15s;
 }
-#main-canvas,#overlay-canvas{
-  position:absolute;top:0;left:0;width:100%;height:100%;
+.uav:first-child{margin-left:0}
+.uav:hover{transform:scale(1.15);z-index:1}
+#room-chip{
+  font-size:11px;color:var(--text2);background:var(--surface2);
+  padding:4px 9px;border-radius:7px;cursor:pointer;
+  font-family:'DM Mono',monospace;border:1px solid var(--border);transition:.15s;
 }
+#room-chip:hover{color:var(--accent);border-color:var(--accent)}
+
+/* ══════════════════════════════════════════════
+   CANVAS AREA
+══════════════════════════════════════════════ */
+#wrap{
+  flex:1;position:relative;overflow:hidden;
+  background:#14141e;
+  background-image:
+    linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);
+  background-size:32px 32px;
+}
+#main-canvas,#overlay-canvas{position:absolute;top:0;left:0;width:100%;height:100%}
 #overlay-canvas{pointer-events:none}
+#cursors-layer,#notes-layer,#reactions-layer{position:absolute;inset:0;pointer-events:none;z-index:300}
+#notes-layer{z-index:250}
+#reactions-layer{z-index:400;pointer-events:none}
 
-.remote-cursor{
-  position:absolute;pointer-events:none;z-index:500;
-  transform:translate(-2px,-2px);transition:top .05s,left .05s;
+/* ══════════════════════════════════════════════
+   REMOTE CURSORS
+══════════════════════════════════════════════ */
+.rcursor{
+  position:absolute;pointer-events:none;transition:left .06s,top .06s;
 }
-.cursor-label{
-  position:absolute;top:20px;left:8px;padding:2px 7px;border-radius:20px;
-  font-size:11px;font-weight:600;color:#fff;white-space:nowrap;
+.rcursor svg{filter:drop-shadow(1px 2px 4px rgba(0,0,0,.5))}
+.rcursor-label{
+  position:absolute;top:22px;left:10px;
+  padding:2px 7px;border-radius:12px;font-size:10px;font-weight:600;
+  color:#fff;white-space:nowrap;
 }
 
-.sticky-note{
-  position:absolute;min-width:180px;min-height:120px;border-radius:12px;
-  padding:10px;font-size:13px;line-height:1.5;cursor:move;user-select:none;
-  box-shadow:0 4px 20px rgba(0,0,0,.3);resize:both;overflow:auto;z-index:200;
+/* ══════════════════════════════════════════════
+   STICKY NOTES
+══════════════════════════════════════════════ */
+.snote{
+  position:absolute;border-radius:10px;padding:8px;
+  box-shadow:0 4px 24px rgba(0,0,0,.35);
+  resize:both;overflow:auto;z-index:250;
+  pointer-events:all;min-width:160px;min-height:100px;
 }
-.sticky-note textarea{
-  width:100%;height:calc(100% - 28px);background:transparent;border:none;
+.snote-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:4px}
+.snote-colors{display:flex;gap:3px}
+.snote-dot{width:13px;height:13px;border-radius:50%;cursor:pointer;border:1px solid rgba(0,0,0,.15);flex-shrink:0}
+.snote-del{
+  width:18px;height:18px;border:none;background:rgba(0,0,0,.15);
+  border-radius:50%;cursor:pointer;font-size:11px;color:#333;
+  display:flex;align-items:center;justify-content:center;opacity:.5;flex-shrink:0;
+}
+.snote-del:hover{opacity:1;background:rgba(255,0,0,.2)}
+.snote textarea{
+  width:100%;height:calc(100% - 32px);background:transparent;border:none;
   outline:none;font-family:'DM Sans',sans-serif;font-size:13px;
-  color:#1a1a1a;resize:none;cursor:text;
+  color:#1a1a2e;resize:none;line-height:1.5;pointer-events:all;
 }
-.note-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
-.note-color-btns{display:flex;gap:4px}
-.note-color-btn{width:14px;height:14px;border-radius:50%;cursor:pointer;border:1px solid rgba(0,0,0,.15)}
-.note-delete-btn{
-  width:20px;height:20px;border:none;background:rgba(0,0,0,.15);
-  border-radius:50%;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;
-  color:#333;opacity:0.6;
-}
-.note-delete-btn:hover{opacity:1;background:rgba(255,0,0,.2)}
 
-#ctx-menu{
+/* ══════════════════════════════════════════════
+   CHAT PANEL
+══════════════════════════════════════════════ */
+#chat-panel{
+  position:absolute;right:0;top:0;bottom:0;width:280px;
+  background:var(--surface);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;z-index:200;
+  transform:translateX(100%);transition:transform .25s;
+  pointer-events:all;
+}
+#chat-panel.open{transform:translateX(0)}
+#chat-header{
+  padding:14px 16px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
+}
+#chat-title{font-size:14px;font-weight:500}
+#chat-close{
+  width:26px;height:26px;border:none;background:var(--surface2);
+  border-radius:6px;cursor:pointer;color:var(--text2);font-size:14px;
+  display:flex;align-items:center;justify-content:center;
+}
+#chat-close:hover{background:var(--border);color:var(--text)}
+#chat-msgs{
+  flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;
+}
+#chat-msgs::-webkit-scrollbar{width:4px}
+#chat-msgs::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.cmsg{display:flex;flex-direction:column;gap:2px}
+.cmsg-meta{display:flex;align-items:center;gap:6px}
+.cmsg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.cmsg-name{font-size:11px;font-weight:500;color:var(--text2)}
+.cmsg-time{font-size:10px;color:var(--text3);margin-left:auto}
+.cmsg-text{
+  font-size:13px;color:var(--text);line-height:1.5;
+  background:var(--surface2);padding:7px 10px;border-radius:8px;
+  border-top-left-radius:2px;word-break:break-word;
+}
+.cmsg.mine .cmsg-text{background:var(--accent-dim);border-top-left-radius:8px;border-top-right-radius:2px}
+.cmsg.mine .cmsg-meta{flex-direction:row-reverse}
+#chat-input-wrap{
+  padding:10px;border-top:1px solid var(--border);display:flex;gap:6px;flex-shrink:0;
+}
+#chat-input{
+  flex:1;background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;
+  font-size:13px;padding:8px 10px;outline:none;resize:none;height:36px;
+  transition:.2s;
+}
+#chat-input:focus{border-color:var(--accent)}
+#chat-send{
+  width:34px;height:36px;background:var(--accent);border:none;border-radius:8px;
+  cursor:pointer;color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;transition:.15s;
+}
+#chat-send:hover{background:#6a5ce8}
+#chat-badge{
+  position:absolute;top:-4px;right:-4px;width:16px;height:16px;
+  background:var(--accent2);border-radius:50%;font-size:9px;font-weight:700;
+  color:#fff;display:none;align-items:center;justify-content:center;
+}
+#chat-badge.show{display:flex}
+
+/* ══════════════════════════════════════════════
+   REACTIONS
+══════════════════════════════════════════════ */
+.reaction-float{
+  position:absolute;font-size:28px;pointer-events:none;
+  animation:rfloat 2.5s ease-out forwards;z-index:401;
+}
+@keyframes rfloat{
+  0%{transform:scale(0) translateY(0);opacity:1}
+  20%{transform:scale(1.3) translateY(-10px);opacity:1}
+  100%{transform:scale(0.8) translateY(-80px);opacity:0}
+}
+
+/* ══════════════════════════════════════════════
+   RENAME MODAL
+══════════════════════════════════════════════ */
+#rename-modal{
+  position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:3000;
+  display:none;align-items:center;justify-content:center;
+}
+#rename-modal.show{display:flex}
+#rename-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:16px;
+  padding:28px;width:320px;box-shadow:var(--shadow);
+}
+#rename-card h3{font-size:16px;font-weight:500;margin-bottom:16px}
+#rename-input{
+  width:100%;padding:11px 13px;background:var(--bg);border:1px solid var(--border);
+  border-radius:9px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;
+  outline:none;margin-bottom:14px;transition:.2s;
+}
+#rename-input:focus{border-color:var(--accent)}
+.rename-btns{display:flex;gap:8px}
+.rename-btns button{flex:1;padding:10px;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer}
+#rename-ok{background:var(--accent);color:#fff}
+#rename-ok:hover{background:#6a5ce8}
+#rename-cancel{background:var(--surface2);color:var(--text)}
+#rename-cancel:hover{background:var(--border)}
+
+/* ══════════════════════════════════════════════
+   SELECTION BOX
+══════════════════════════════════════════════ */
+#selection-box{
+  position:absolute;border:2px dashed var(--accent);pointer-events:none;
+  border-radius:4px;display:none;background:rgba(124,109,250,.05);
+}
+
+/* ══════════════════════════════════════════════
+   CONTEXT MENU
+══════════════════════════════════════════════ */
+#ctx{
   position:fixed;background:var(--surface);border:1px solid var(--border);
-  border-radius:10px;padding:6px;min-width:140px;box-shadow:var(--shadow);
+  border-radius:10px;padding:5px;min-width:160px;box-shadow:var(--shadow);
   z-index:1000;display:none;
 }
-.ctx-item{padding:8px 12px;border-radius:7px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px;}
-.ctx-item:hover{background:var(--surface2)}
-.ctx-item.danger{color:var(--accent2)}
+.ci{
+  padding:7px 12px;border-radius:7px;cursor:pointer;font-size:13px;
+  display:flex;align-items:center;gap:8px;color:var(--text);transition:.1s;
+}
+.ci:hover{background:var(--surface2)}
+.ci.red{color:var(--accent2)}
+.ci-sep{height:1px;background:var(--border);margin:4px 0}
 
+/* ══════════════════════════════════════════════
+   TOAST
+══════════════════════════════════════════════ */
 #toast{
-  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
-  background:var(--surface);border:1px solid var(--border);color:var(--text);
-  padding:10px 20px;border-radius:10px;font-size:13px;z-index:9999;
-  opacity:0;transition:.3s;pointer-events:none;
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(16px);
+  background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  padding:9px 18px;border-radius:9px;font-size:13px;z-index:9999;
+  opacity:0;transition:.3s;pointer-events:none;white-space:nowrap;
 }
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
-::-webkit-scrollbar{width:6px}
+/* ══════════════════════════════════════════════
+   ZOOM INDICATOR
+══════════════════════════════════════════════ */
+#zoom-indicator{
+  position:absolute;bottom:16px;left:16px;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:4px 10px;
+  font-size:11px;font-family:'DM Mono',monospace;color:var(--text2);
+  pointer-events:none;opacity:0;transition:opacity .3s;z-index:100;
+}
+#zoom-indicator.show{opacity:1}
+
+/* Scrollbar global */
+::-webkit-scrollbar{width:5px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 </style>
 </head>
 <body>
 
-<!-- LOBBY -->
+<!-- ══ LOBBY ══ -->
 <div id="lobby">
-  <div class="lobby-card">
-    <div class="lobby-logo">✦ Whiteboard</div>
-    <div class="lobby-sub">Real-time collaborative canvas</div>
+  <div class="lcard">
+    <div class="logo">✦ Whiteboard</div>
+    <div class="logo-sub">Real-time collaborative canvas</div>
     <div class="tabs">
-      <button class="tab active" onclick="switchTab('create')">Yangi xona</button>
-      <button class="tab" onclick="switchTab('join')">Kirish</button>
+      <button class="tab-btn on" onclick="ltab('create')">Yangi xona</button>
+      <button class="tab-btn" onclick="ltab('join')">Kirish</button>
     </div>
-    <div id="error-msg" class="error-msg"></div>
-    <div id="tab-create" class="tab-panel active">
-      <div class="form-group">
+    <div id="lerr" class="err"></div>
+
+    <div id="tp-create" class="tp on">
+      <div class="fg">
+        <label>Ismingiz</label>
+        <input class="fi" id="create-name" placeholder="Alex, Sam..."/>
+      </div>
+      <div class="fg">
         <label>Xona nomi (ixtiyoriy)</label>
-        <input type="text" id="room-name" placeholder="Masalan: Dizayn muhokamasi"/>
+        <input class="fi" id="room-name" placeholder="Loyiha muhokamasi"/>
       </div>
-      <div class="form-group">
+      <div class="fg">
         <label>Parol (ixtiyoriy)</label>
-        <input type="password" id="create-password" placeholder="Xonani himoyalash uchun"/>
+        <input class="fi" type="password" id="create-pwd" placeholder="Himoyalash uchun"/>
       </div>
-      <button class="btn btn-primary" onclick="createRoom()">Xona yaratish →</button>
+      <div class="fg">
+        <label>Rasm max o'lchami (px)</label>
+        <div class="fi-row">
+          <input class="fi" type="number" id="img-maxw" value="800" min="100" max="3000" placeholder="Kenglik"/>
+          <span style="color:var(--text2);display:flex;align-items:center;font-size:13px">×</span>
+          <input class="fi" type="number" id="img-maxh" value="600" min="100" max="3000" placeholder="Balandlik"/>
+        </div>
+      </div>
+      <button class="btn btn-p" onclick="createRoom()">Xona yaratish →</button>
     </div>
-    <div id="tab-join" class="tab-panel">
-      <div class="form-group">
+
+    <div id="tp-join" class="tp">
+      <div class="fg">
+        <label>Ismingiz</label>
+        <input class="fi" id="join-name" placeholder="Alex, Sam..."/>
+      </div>
+      <div class="fg">
         <label>Xona ID</label>
-        <input type="text" id="join-room-id" placeholder="8 belgili ID" maxlength="8" style="font-family:'DM Mono',monospace;letter-spacing:2px"/>
+        <input class="fi" id="join-id" placeholder="8 belgili ID" maxlength="8" style="font-family:'DM Mono',monospace;letter-spacing:2px"/>
       </div>
-      <div class="form-group" id="password-field" style="display:none">
+      <div class="fg" id="pwd-field" style="display:none">
         <label>Parol</label>
-        <input type="password" id="join-password" placeholder="Xona paroli"/>
+        <input class="fi" type="password" id="join-pwd" placeholder="Xona paroli"/>
       </div>
-      <button class="btn btn-primary" onclick="joinRoom()">Kirish →</button>
-      <button class="btn btn-secondary" onclick="checkRoomPassword()">Tekshirish</button>
+      <button class="btn btn-p" onclick="joinRoom()">Kirish →</button>
+      <button class="btn btn-s" onclick="checkRoom()">Tekshirish</button>
     </div>
   </div>
 </div>
 
-<!-- APP -->
+<!-- ══ APP ══ -->
 <div id="app">
   <div id="toolbar">
-    <div class="tool-group">
-      <button class="tool-btn active" id="tool-pen" title="Qalam (P)" onclick="setTool('pen')">✏️</button>
-      <button class="tool-btn" id="tool-eraser" title="O'chirg'ich (E)" onclick="setTool('eraser')">🧹</button>
-      <button class="tool-btn" id="tool-line" title="Chiziq (L)" onclick="setTool('line')">╱</button>
-      <button class="tool-btn" id="tool-rect" title="To'rtburchak (R)" onclick="setTool('rect')">▭</button>
-      <button class="tool-btn" id="tool-circle" title="Doira (C)" onclick="setTool('circle')">◯</button>
-      <button class="tool-btn" id="tool-triangle" title="Uchburchak" onclick="setTool('triangle')">△</button>
-      <button class="tool-btn" id="tool-arrow" title="O'q" onclick="setTool('arrow')">→</button>
-      <button class="tool-btn" id="tool-text" title="Matn (T)" onclick="setTool('text')">T</button>
-      <button class="tool-btn" id="tool-select" title="Tanlash (S)" onclick="setTool('select')">↖</button>
+    <!-- Chizish asboblari -->
+    <div class="tg">
+      <button class="tb on" id="tool-pen" data-tip="Qalam (P)" onclick="setTool('pen')">✏️</button>
+      <button class="tb" id="tool-eraser" data-tip="O'chirg'ich (E)" onclick="setTool('eraser')">🧹</button>
+      <button class="tb" id="tool-select" data-tip="Tanlash (S)" onclick="setTool('select')">↖</button>
     </div>
-    <div class="tool-group" style="gap:5px">
-      <div class="color-swatch active" style="background:#e8e8f0" onclick="setColor('#e8e8f0')"></div>
-      <div class="color-swatch" style="background:#6c63ff" onclick="setColor('#6c63ff')"></div>
-      <div class="color-swatch" style="background:#ff6584" onclick="setColor('#ff6584')"></div>
-      <div class="color-swatch" style="background:#43e97b" onclick="setColor('#43e97b')"></div>
-      <div class="color-swatch" style="background:#f9c74f" onclick="setColor('#f9c74f')"></div>
-      <div class="color-swatch" style="background:#48cae4" onclick="setColor('#48cae4')"></div>
-      <div class="color-swatch" style="background:#ff9f1c" onclick="setColor('#ff9f1c')"></div>
-      <div class="color-swatch" style="background:#ef233c" onclick="setColor('#ef233c')"></div>
-      <input type="color" id="custom-color" value="#ffffff" onchange="setColor(this.value)" title="Maxsus rang"/>
+    <!-- Shakllar -->
+    <div class="tg">
+      <button class="tb" id="tool-line" data-tip="Chiziq (L)" onclick="setTool('line')">╱</button>
+      <button class="tb" id="tool-rect" data-tip="To'rtburchak (R)" onclick="setTool('rect')">▭</button>
+      <button class="tb" id="tool-circle" data-tip="Doira (C)" onclick="setTool('circle')">◯</button>
+      <button class="tb" id="tool-triangle" data-tip="Uchburchak" onclick="setTool('triangle')">△</button>
+      <button class="tb" id="tool-arrow" data-tip="O'q" onclick="setTool('arrow')">→</button>
+      <button class="tb" id="tool-text" data-tip="Matn (T)" onclick="setTool('text')">T</button>
     </div>
-    <div class="tool-group" style="gap:8px">
-      <button class="tool-btn" id="fill-toggle" title="To'ldirish" onclick="toggleFill()">◈</button>
-      <input type="range" id="stroke-width" min="1" max="40" value="3" oninput="updateWidth(this.value)"/>
-      <span id="width-display" style="font-size:12px;color:var(--text2);min-width:20px;text-align:center">3</span>
-      <input type="range" id="opacity-range" min="10" max="100" value="100" oninput="updateOpacity(this.value)"/>
-      <span id="opacity-display" style="font-size:12px;color:var(--text2);min-width:30px">100%</span>
+    <!-- Ranglar -->
+    <div class="tg" style="gap:4px">
+      <div class="csw on" style="background:#e2e2ee" onclick="setColor('#e2e2ee')"></div>
+      <div class="csw" style="background:#7c6dfa" onclick="setColor('#7c6dfa')"></div>
+      <div class="csw" style="background:#ff6b8a" onclick="setColor('#ff6b8a')"></div>
+      <div class="csw" style="background:#4ade80" onclick="setColor('#4ade80')"></div>
+      <div class="csw" style="background:#facc15" onclick="setColor('#facc15')"></div>
+      <div class="csw" style="background:#38bdf8" onclick="setColor('#38bdf8')"></div>
+      <div class="csw" style="background:#fb923c" onclick="setColor('#fb923c')"></div>
+      <div class="csw" style="background:#f87171" onclick="setColor('#f87171')"></div>
+      <input type="color" id="color-custom" value="#ffffff" onchange="setColor(this.value)" title="Maxsus rang"/>
     </div>
-    <div class="tool-group">
-      <button class="tool-btn" title="Orqaga (Ctrl+Z)" onclick="undo()">↩</button>
-      <button class="tool-btn" title="Sticky note" onclick="addStickyNote()">📌</button>
-      <button class="tool-btn" title="Rasm yuklash" onclick="document.getElementById('img-upload').click()">🖼</button>
-      <input type="file" id="img-upload" accept="image/*" style="display:none" onchange="handleImageUpload(event)"/>
-      <button class="tool-btn" title="Yuklab olish" onclick="downloadCanvas()">💾</button>
-      <button class="tool-btn" title="Tozalash" onclick="clearBoard()" style="color:var(--accent2)">🗑</button>
+    <!-- Qalinlik va shaffoflik -->
+    <div class="tg" style="gap:6px">
+      <button class="tb" id="fill-btn" data-tip="To'ldirish" onclick="toggleFill()">◈</button>
+      <input class="rng" type="range" id="width-rng" min="1" max="40" value="3" oninput="setWidth(this.value)"/>
+      <span class="rlbl" id="width-lbl">3</span>
+      <div class="sep"></div>
+      <input class="rng" type="range" id="opacity-rng" min="10" max="100" value="100" oninput="setOpacity(this.value)"/>
+      <span class="rlbl" id="opacity-lbl">100%</span>
     </div>
-    <div id="users-panel">
+    <!-- Zoom -->
+    <div class="tg" style="gap:2px">
+      <button class="tb" data-tip="Kichraytirish (-)" onclick="zoom(-0.1)">−</button>
+      <span id="zoom-display" onclick="resetZoom()" data-tip="Reset">100%</span>
+      <button class="tb" data-tip="Kattalashtirish (+)" onclick="zoom(0.1)">+</button>
+    </div>
+    <!-- Amallar -->
+    <div class="tg">
+      <button class="tb" data-tip="Orqaga (Ctrl+Z)" onclick="undo()">↩</button>
+      <button class="tb" data-tip="Qaytarish (Ctrl+Y)" onclick="redo()">↪</button>
+      <button class="tb" data-tip="Sticky note" onclick="addNote()">📌</button>
+      <button class="tb" data-tip="Rasm yuklash" onclick="document.getElementById('img-input').click()">🖼</button>
+      <input type="file" id="img-input" accept="image/*" style="display:none" onchange="loadImage(event)"/>
+      <button class="tb" data-tip="Reaktsiya" onclick="toggleReactionPicker()">🎉</button>
+      <div id="reaction-picker" style="display:none;position:absolute;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px;gap:6px;flex-wrap:wrap;width:160px;top:48px;z-index:500">
+        <span style="font-size:20px;cursor:pointer" onclick="sendReaction('👍')">👍</span>
+        <span style="font-size:20px;cursor:pointer" onclick="sendReaction('❤️')">❤️</span>
+        <span style="font-size:20px;cursor:pointer" onclick="sendReaction('🔥')">🔥</span>
+        <span style="font-size:20px;cursor:pointer" onclick="sendReaction('⭐')">⭐</span>
+        <span style="font-size:20px;cursor:pointer" onclick="sendReaction('😂')">😂</span>
+        <span style="font-size:20px;cursor:pointer" onclick="sendReaction('🎉')">🎉</span>
+        <span style="font-size:20px;cursor:pointer" onclick="sendReaction('💡')">💡</span>
+        <span style="font-size:20px;cursor:pointer" onclick="sendReaction('✅')">✅</span>
+      </div>
+    </div>
+    <!-- Eksport va boshqalar -->
+    <div class="tg">
+      <button class="tb" data-tip="PNG yuklash" onclick="exportPNG()">💾</button>
+      <button class="tb" data-tip="PDF yuklash" onclick="exportPDF()">📄</button>
+      <button class="tb" data-tip="Tozalash" onclick="clearAll()" style="color:var(--accent2)">🗑</button>
+    </div>
+    <!-- Users + Chat -->
+    <div class="tg" style="gap:6px">
       <div id="avatar-list" style="display:flex;align-items:center"></div>
-      <div id="room-info" onclick="copyRoomLink()">📋 —</div>
+      <div id="room-chip" onclick="copyLink()">📋 —</div>
+      <button class="tb" id="chat-btn" data-tip="Chat" onclick="toggleChat()" style="position:relative">
+        💬
+        <div id="chat-badge"></div>
+      </button>
     </div>
   </div>
-  <div id="canvas-wrap">
+
+  <!-- Canvas -->
+  <div id="wrap">
     <canvas id="main-canvas"></canvas>
     <canvas id="overlay-canvas"></canvas>
-    <div id="cursors-layer" style="position:absolute;inset:0;pointer-events:none;z-index:400"></div>
-    <div id="notes-layer" style="position:absolute;inset:0;pointer-events:none;z-index:200"></div>
+    <div id="cursors-layer"></div>
+    <div id="notes-layer"></div>
+    <div id="reactions-layer"></div>
+    <div id="selection-box"></div>
+    <div id="zoom-indicator">100%</div>
+
+    <!-- Chat panel -->
+    <div id="chat-panel">
+      <div id="chat-header">
+        <span id="chat-title">Chat</span>
+        <button id="chat-close" onclick="toggleChat()">✕</button>
+      </div>
+      <div id="chat-msgs"></div>
+      <div id="chat-input-wrap">
+        <textarea id="chat-input" placeholder="Xabar yozing..." rows="1"></textarea>
+        <button id="chat-send" onclick="sendChat()">↑</button>
+      </div>
+    </div>
   </div>
 </div>
 
-<div id="ctx-menu">
-  <div class="ctx-item" onclick="undo()">↩ Orqaga</div>
-  <div class="ctx-item" onclick="addStickyNote()">📌 Sticky note</div>
-  <div class="ctx-item" onclick="downloadCanvas()">💾 Yuklab olish</div>
-  <div class="ctx-item danger" onclick="clearBoard()">🗑 Hammasini tozalash</div>
+<!-- Context menu -->
+<div id="ctx">
+  <div class="ci" onclick="ctxUndo()">↩ Orqaga</div>
+  <div class="ci" onclick="ctxRedo()">↪ Qaytarish</div>
+  <div class="ci-sep"></div>
+  <div class="ci" id="ctx-front" onclick="bringFront()" style="display:none">⬆ Oldinga</div>
+  <div class="ci" id="ctx-back" onclick="sendBack()" style="display:none">⬇ Orqaga</div>
+  <div class="ci" id="ctx-del" onclick="deleteSelected()" style="display:none">✕ O'chirish</div>
+  <div class="ci-sep" id="ctx-sep2" style="display:none"></div>
+  <div class="ci" onclick="addNote()">📌 Sticky note</div>
+  <div class="ci" onclick="exportPNG()">💾 PNG eksport</div>
+  <div class="ci" onclick="exportPDF()">📄 PDF eksport</div>
+  <div class="ci-sep"></div>
+  <div class="ci red" onclick="clearAll()">🗑 Hammasini tozalash</div>
 </div>
+
+<!-- Rename modal -->
+<div id="rename-modal">
+  <div id="rename-card">
+    <h3>Ismingizni o'zgartiring</h3>
+    <input id="rename-input" class="fi" placeholder="Yangi ism" maxlength="30"/>
+    <div class="rename-btns">
+      <button id="rename-cancel" onclick="closeRename()">Bekor</button>
+      <button id="rename-ok" onclick="confirmRename()">Saqlash</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
-// ════ CONFIG ════
+// ════════════════════════════════════════════════════
+// CONFIG
+// ════════════════════════════════════════════════════
 const SERVER_URL = 'https://whiteboard-backend-jeh6.onrender.com';
 
-// ════ STATE ════
+// ════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════
 let socket = null;
-let currentRoomId = null;
-let currentUser = null;
-let currentTool = 'pen';
-let currentColor = '#e8e8f0';
-let currentWidth = 3;
-let currentOpacity = 1;
-let fillEnabled = false;
-let isDrawing = false;
-let currentStrokeId = null;
-let currentPoints = [];
-let startX = 0, startY = 0;
-let strokes = [];
-let stickyNotes = {};
-let remoteStrokes = {};
-let onlineUsers = {};
-let textInput = null;
-const cursors = {};
+let roomId = null;
+let me = null; // { userId, name, color }
+let tool = 'pen';
+let color = '#e2e2ee';
+let strokeW = 3;
+let opacity = 1;
+let fillOn = false;
+let imgMaxW = 800, imgMaxH = 600;
 
-// Canvas
-const mainCanvas = document.getElementById('main-canvas');
-const overlayCanvas = document.getElementById('overlay-canvas');
-const ctx = mainCanvas.getContext('2d');
-const octx = overlayCanvas.getContext('2d');
+// Zoom & Pan
+let scale = 1;
+let panX = 0, panY = 0;
+let isPanning = false;
+let spaceDown = false;
+let panStart = null;
 
-// ════ CANVAS RESIZE ════
+// Drawing
+let drawing = false;
+let strokeId = null;
+let pts = [];
+let sx = 0, sy = 0;
+
+// Strokes storage
+let strokes = []; // { id, tool, pts, shape, color, w, opacity, fill, fontSize, text, imgData, zIdx, userId }
+let undoStack = []; // strokeId array for redo
+let remoteDrawing = {}; // userId -> {color,w,opacity,pts}
+
+// Selection
+let selectedId = null;
+let isDraggingStroke = false;
+let dragStrokeStart = null;
+let dragStrokeOrigin = null;
+
+// Image resize
+let resizingImg = null; // { strokeId, handle, startX, startY, origW, origH, origX, origY }
+
+// Chat
+let chatOpen = false;
+let unreadCount = 0;
+let chatHistory = [];
+
+// Cursors
+const remoteCursors = {};
+const onlineUsers = {};
+
+// Text input
+let textEl = null;
+
+// Context menu target
+let ctxTarget = null;
+
+// Canvas refs
+const mainC = document.getElementById('main-canvas');
+const overlayC = document.getElementById('overlay-canvas');
+const ctx = mainC.getContext('2d');
+const octx = overlayC.getContext('2d');
+
+// ════════════════════════════════════════════════════
+// CANVAS RESIZE
+// ════════════════════════════════════════════════════
 function resizeCanvas() {
-  const wrap = document.getElementById('canvas-wrap');
+  const wrap = document.getElementById('wrap');
   if (!wrap) return;
-  const w = wrap.clientWidth;
-  const h = wrap.clientHeight;
-  if (w === 0 || h === 0) return;
-  mainCanvas.width = w;
-  mainCanvas.height = h;
-  overlayCanvas.width = w;
-  overlayCanvas.height = h;
-  redrawAll();
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  if (!w || !h) return;
+  mainC.width = w; mainC.height = h;
+  overlayC.width = w; overlayC.height = h;
+  redraw();
 }
-
 window.addEventListener('resize', resizeCanvas);
 
-// ════ LOBBY ════
-function switchTab(tab) {
-  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='create')||(i===1&&tab==='join')));
-  document.getElementById('tab-create').classList.toggle('active', tab==='create');
-  document.getElementById('tab-join').classList.toggle('active', tab==='join');
-  hideError();
+// ════════════════════════════════════════════════════
+// LOBBY
+// ════════════════════════════════════════════════════
+function ltab(t) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('on', (i===0&&t==='create')||(i===1&&t==='join')));
+  document.getElementById('tp-create').classList.toggle('on', t==='create');
+  document.getElementById('tp-join').classList.toggle('on', t==='join');
+  hideErr();
 }
-
-function showError(msg) {
-  const el = document.getElementById('error-msg');
-  el.textContent = msg;
-  el.style.display = 'block';
-}
-function hideError() {
-  document.getElementById('error-msg').style.display = 'none';
-}
+function showErr(m) { const e = document.getElementById('lerr'); e.textContent = m; e.style.display = 'block'; }
+function hideErr() { document.getElementById('lerr').style.display = 'none'; }
 
 async function createRoom() {
-  const name = document.getElementById('room-name').value;
-  const password = document.getElementById('create-password').value;
+  const name = document.getElementById('create-name').value.trim();
+  const rname = document.getElementById('room-name').value;
+  const pwd = document.getElementById('create-pwd').value;
+  imgMaxW = parseInt(document.getElementById('img-maxw').value) || 800;
+  imgMaxH = parseInt(document.getElementById('img-maxh').value) || 600;
   try {
     const res = await fetch(`${SERVER_URL}/api/rooms`, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ name, password }),
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ name: rname, password: pwd }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
-    enterRoom(data.roomId);
-  } catch (e) {
-    showError(e.message || 'Xona yaratib bo\'lmadi');
-  }
+    enterRoom(data.roomId, name);
+  } catch(e) { showErr(e.message || 'Xona yaratib bo\'lmadi'); }
 }
 
-async function checkRoomPassword() {
-  const roomId = document.getElementById('join-room-id').value.trim().toLowerCase();
-  if (!roomId) return showError('Xona ID kiriting');
+async function checkRoom() {
+  const id = document.getElementById('join-id').value.trim().toLowerCase();
+  if (!id) return showErr('Xona ID kiriting');
   try {
-    const res = await fetch(`${SERVER_URL}/api/rooms/${roomId}/join`, {
-      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({}),
+    const res = await fetch(`${SERVER_URL}/api/rooms/${id}/join`, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({}),
     });
     const data = await res.json();
-    if (res.status === 404) return showError('Bunday xona mavjud emas');
+    if (res.status === 404) return showErr('Bunday xona mavjud emas');
     if (data.needsPassword) {
-      document.getElementById('password-field').style.display = 'block';
-      showError('Bu xona himoyalangan — parol kiriting');
+      document.getElementById('pwd-field').style.display = 'block';
+      showErr('Bu xona himoyalangan — parol kiriting');
       return;
     }
-    if (res.ok) enterRoom(roomId);
-  } catch(e) { showError('Server bilan aloqa yo\'q'); }
+    if (res.ok) enterRoom(id, document.getElementById('join-name').value.trim());
+  } catch(e) { showErr('Server bilan aloqa yo\'q'); }
 }
 
 async function joinRoom() {
-  const roomId = document.getElementById('join-room-id').value.trim().toLowerCase();
-  const password = document.getElementById('join-password').value;
-  if (!roomId) return showError('Xona ID kiriting');
+  const id = document.getElementById('join-id').value.trim().toLowerCase();
+  const pwd = document.getElementById('join-pwd').value;
+  const name = document.getElementById('join-name').value.trim();
+  if (!id) return showErr('Xona ID kiriting');
   try {
-    const res = await fetch(`${SERVER_URL}/api/rooms/${roomId}/join`, {
-      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ password }),
+    const res = await fetch(`${SERVER_URL}/api/rooms/${id}/join`, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ password: pwd }),
     });
     const data = await res.json();
-    if (!res.ok) return showError(data.error || 'Kira olmadingiz');
-    enterRoom(roomId);
-  } catch(e) { showError('Server bilan aloqa yo\'q'); }
+    if (!res.ok) return showErr(data.error || 'Kira olmadingiz');
+    enterRoom(id, name);
+  } catch(e) { showErr('Server bilan aloqa yo\'q'); }
 }
 
-function enterRoom(roomId) {
-  currentRoomId = roomId;
+function enterRoom(id, preferredName) {
+  roomId = id;
+  document.getElementById('lobby').classList.add('out');
+  document.getElementById('app').classList.add('on');
+  document.getElementById('room-chip').textContent = `📋 ${id}`;
 
-  // Lobby ni yashirish
-  const lobby = document.getElementById('lobby');
-  lobby.classList.add('hidden');
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    resizeCanvas();
+    connectSocket(id, preferredName);
+    loadData(id);
+    overlayC.style.pointerEvents = 'auto';
+  }));
 
-  // App ni ko'rsatish — visibility ishlatamiz, display emas
-  const app = document.getElementById('app');
-  app.classList.add('visible');
-
-  document.getElementById('room-info').textContent = `📋 ${roomId}`;
-
-  // Canvas wrap ko'ringandan keyin resize
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      resizeCanvas();
-      connectSocket(roomId);
-      loadRoomData(roomId);
-
-      // Overlay canvas ga pointer events qaytarish
-      overlayCanvas.style.pointerEvents = 'auto';
-    });
-  });
-
-  const url = new URL(window.location.href);
-  url.searchParams.set('room', roomId);
-  window.history.pushState({}, '', url);
+  const url = new URL(location.href);
+  url.searchParams.set('room', id);
+  history.pushState({}, '', url);
 }
 
 window.addEventListener('load', () => {
-  const params = new URLSearchParams(window.location.search);
-  const roomId = params.get('room');
-  if (roomId) {
-    document.getElementById('join-room-id').value = roomId;
-    switchTab('join');
-    checkRoomPassword();
-  }
+  const id = new URLSearchParams(location.search).get('room');
+  if (id) { document.getElementById('join-id').value = id; ltab('join'); checkRoom(); }
 });
 
-// ════ SOCKET ════
-function connectSocket(roomId) {
+// ════════════════════════════════════════════════════
+// SOCKET
+// ════════════════════════════════════════════════════
+function connectSocket(id, preferredName) {
   socket = io(SERVER_URL);
-  const userId = localStorage.getItem('wb-user-id') || crypto.randomUUID();
-  localStorage.setItem('wb-user-id', userId);
+  const userId = localStorage.getItem('wb-uid') || crypto.randomUUID();
+  localStorage.setItem('wb-uid', userId);
+  const savedName = preferredName || localStorage.getItem('wb-name') || '';
 
   socket.on('connect', () => {
-    socket.emit('join-room', { roomId, userId });
+    socket.emit('join-room', { roomId: id, userId, preferredName: savedName });
   });
 
   socket.on('joined', ({ user, onlineUsers: users }) => {
-    currentUser = user;
-    users.forEach(u => addUserAvatar(u));
+    me = user;
+    if (user.name) localStorage.setItem('wb-name', user.name);
+    users.forEach(addAvatar);
   });
 
-  socket.on('user-joined', (u) => { addUserAvatar(u); showToast(`${u.name} qo'shildi`); });
-  socket.on('user-left', (u) => { removeUserAvatar(u.userId); removeCursor(u.userId); showToast(`${u.name} chiqdi`); });
-
-  socket.on('stroke-start', ({ userId, tool, color, width, opacity, fillColor }) => {
-    remoteStrokes[userId] = { tool, color, width, opacity, fillColor, points: [] };
+  socket.on('user-joined', (u) => { addAvatar(u); toast(`${u.name} qo'shildi`); });
+  socket.on('user-left', (u) => { removeAvatar(u.userId); removeCursor(u.userId); toast(`${u.name} chiqdi`); });
+  socket.on('user-renamed', ({ userId, name }) => {
+    if (onlineUsers[userId]) { onlineUsers[userId].name = name; updateAvatarTip(userId, name); }
+    if (remoteCursors[userId]) remoteCursors[userId].querySelector('.rcursor-label').textContent = name;
   });
 
+  // Remote drawing
+  socket.on('stroke-start', ({ userId, color: c, w, opacity: op, fill }) => {
+    remoteDrawing[userId] = { color: c, w, opacity: op, fill, pts: [] };
+  });
   socket.on('stroke-point', ({ userId, x, y }) => {
-    if (!remoteStrokes[userId]) return;
-    remoteStrokes[userId].points.push({ x, y });
-    redrawOverlay();
+    if (!remoteDrawing[userId]) return;
+    remoteDrawing[userId].pts.push({ x, y });
+    drawOverlay();
   });
-
   socket.on('stroke-end', (data) => {
-    const { userId, strokeId, tool, points, shapeData, color, width, opacity, fillColor, fontSize, textContent } = data;
-    delete remoteStrokes[userId];
-    strokes.push({ id: strokeId, tool, points, shapeData, color, width, opacity, fillColor, fontSize, textContent, userId });
-    redrawAll();
+    delete remoteDrawing[data.userId];
+    strokes.push(parseStroke(data));
+    strokes.sort((a,b) => (a.zIdx||0)-(b.zIdx||0));
+    redraw();
   });
-
-  socket.on('stroke-removed', ({ strokeId }) => { strokes = strokes.filter(s => s.id !== strokeId); redrawAll(); });
-  socket.on('board-cleared', () => { strokes = []; redrawAll(); });
-
+  socket.on('stroke-removed', ({ strokeId: sid }) => {
+    strokes = strokes.filter(s => s.id !== sid);
+    if (selectedId === sid) selectedId = null;
+    redraw();
+  });
+  socket.on('stroke-move', (data) => {
+    const s = strokes.find(s => s.id === data.strokeId);
+    if (s) { s.pts = data.newPoints || []; s.shape = data.newShapeData; redraw(); }
+  });
+  socket.on('stroke-zindex', ({ strokeId: sid, zIndex }) => {
+    const s = strokes.find(s => s.id === sid);
+    if (s) { s.zIdx = zIndex; strokes.sort((a,b) => (a.zIdx||0)-(b.zIdx||0)); redraw(); }
+  });
+  socket.on('board-cleared', () => { strokes = []; selectedId = null; redraw(); });
   socket.on('image-add', (data) => {
-    strokes.push({ id: data.strokeId, tool: 'image', shapeData: { x: data.x, y: data.y, width: data.width, height: data.height }, imageData: data.imageData });
-    redrawAll();
+    strokes.push({ id: data.strokeId, tool:'image', shape:{x:data.x,y:data.y,width:data.width,height:data.height}, imgData:data.imageData, zIdx:data.zIndex||0 });
+    strokes.sort((a,b) => (a.zIdx||0)-(b.zIdx||0));
+    redraw();
   });
-
-  socket.on('note-add', (data) => { createNoteEl(data.noteId, data.x, data.y, data.content, data.bgColor, false); });
-  socket.on('note-update', (data) => {
-    const el = document.querySelector(`[data-note-id="${data.noteId}"] textarea`);
-    if (el) el.value = data.content;
+  socket.on('image-resize', (data) => {
+    const s = strokes.find(s => s.id === data.strokeId);
+    if (s) { s.shape = { x:data.x, y:data.y, width:data.width, height:data.height }; redraw(); }
   });
-  socket.on('note-delete', ({ noteId }) => {
-    const el = document.querySelector(`[data-note-id="${noteId}"]`);
-    if (el) el.remove();
-    delete stickyNotes[noteId];
-  });
-
-  socket.on('cursor-move', (data) => { updateRemoteCursor(data); });
-  socket.on('error', ({ message }) => { showToast('⚠️ ' + message); });
+  socket.on('note-add', d => createNoteEl(d.noteId, d.x, d.y, d.content, d.bgColor));
+  socket.on('note-update', d => { const el = document.querySelector(`[data-nid="${d.noteId}"] textarea`); if(el) el.value = d.content; });
+  socket.on('note-delete', ({ noteId }) => { const el = document.querySelector(`[data-nid="${noteId}"]`); if(el) el.remove(); });
+  socket.on('chat-message', appendMsg);
+  socket.on('reaction', d => showReaction(d.x, d.y, d.emoji));
+  socket.on('cursor-move', d => updateCursor(d));
+  socket.on('error', ({ message }) => toast('⚠️ ' + message));
 }
 
-async function loadRoomData(roomId) {
+function parseStroke(d) {
+  return {
+    id: d.strokeId || d.id, tool: d.tool,
+    pts: d.points || d.pts || [],
+    shape: d.shapeData || d.shape_data || d.shape,
+    color: d.color, w: d.width || d.w,
+    opacity: d.opacity, fill: d.fillColor || d.fill_color || d.fill,
+    fontSize: d.fontSize || d.font_size,
+    text: d.textContent || d.text_content || d.text,
+    imgData: d.imageData || d.image_data || d.imgData,
+    zIdx: d.zIndex || d.z_index || d.zIdx || 0,
+    userId: d.userId || d.user_id,
+  };
+}
+
+async function loadData(id) {
   try {
-    const res = await fetch(`${SERVER_URL}/api/rooms/${roomId}/data`);
+    const res = await fetch(`${SERVER_URL}/api/rooms/${id}/data`);
     const data = await res.json();
-    strokes = data.strokes.map(s => ({
-      id: s.id, tool: s.tool, points: s.points || [],
-      shapeData: s.shape_data, color: s.color, width: s.width,
-      opacity: s.opacity, fillColor: s.fill_color, fontSize: s.font_size,
-      textContent: s.text_content, imageData: s.image_data, userId: s.user_id,
+    strokes = data.strokes.map(s => parseStroke({
+      ...s, strokeId: s.id, points: s.points, shapeData: s.shape_data,
+      fillColor: s.fill_color, fontSize: s.font_size, textContent: s.text_content,
+      imageData: s.image_data, zIndex: s.z_index,
     }));
-    data.notes.forEach(n => createNoteEl(n.id, n.x, n.y, n.content, n.bg_color, false));
-    redrawAll();
-  } catch(e) { console.error('Load data error:', e); }
+    strokes.sort((a,b) => (a.zIdx||0)-(b.zIdx||0));
+    data.notes.forEach(n => createNoteEl(n.id, n.x, n.y, n.content, n.bg_color));
+    chatHistory = data.chat || [];
+    chatHistory.forEach(m => appendMsg(m, false));
+    redraw();
+  } catch(e) { console.error('Load error:', e); }
 }
 
-// ════ TOOLS ════
-function setTool(tool) {
-  currentTool = tool;
-  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-  const btn = document.getElementById(`tool-${tool}`);
-  if (btn) btn.classList.add('active');
-  overlayCanvas.style.cursor = tool === 'eraser' ? 'cell' : tool === 'text' ? 'text' : 'crosshair';
-  if (tool === 'select') overlayCanvas.style.cursor = 'default';
+// ════════════════════════════════════════════════════
+// TOOLS
+// ════════════════════════════════════════════════════
+function setTool(t) {
+  tool = t;
+  document.querySelectorAll('.tb[id^="tool-"]').forEach(b => b.classList.remove('on'));
+  const btn = document.getElementById(`tool-${t}`);
+  if (btn) btn.classList.add('on');
+  if (t !== 'select') { selectedId = null; redraw(); }
+  overlayC.style.cursor = t==='eraser' ? 'cell' : t==='text' ? 'text' : t==='select' ? 'default' : 'crosshair';
 }
 
 function setColor(c) {
-  currentColor = c;
-  document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
-  document.querySelectorAll('.color-swatch').forEach(s => { if (s.style.background === c) s.classList.add('active'); });
+  color = c;
+  document.querySelectorAll('.csw').forEach(s => s.classList.remove('on'));
+  document.querySelectorAll('.csw').forEach(s => { if(s.style.background===c) s.classList.add('on'); });
 }
 
-function updateWidth(v) { currentWidth = parseInt(v); document.getElementById('width-display').textContent = v; }
-function updateOpacity(v) { currentOpacity = parseInt(v) / 100; document.getElementById('opacity-display').textContent = v + '%'; }
-function toggleFill() { fillEnabled = !fillEnabled; document.getElementById('fill-toggle').classList.toggle('active', fillEnabled); }
+function setWidth(v) { strokeW = parseInt(v); document.getElementById('width-lbl').textContent = v; }
+function setOpacity(v) { opacity = parseInt(v)/100; document.getElementById('opacity-lbl').textContent = v+'%'; }
+function toggleFill() { fillOn = !fillOn; document.getElementById('fill-btn').classList.toggle('on', fillOn); }
 
-// ════ CANVAS EVENTS ════
-overlayCanvas.addEventListener('mousedown', onPointerDown);
-overlayCanvas.addEventListener('mousemove', onPointerMove);
-overlayCanvas.addEventListener('mouseup', onPointerUp);
-overlayCanvas.addEventListener('mouseleave', onPointerUp);
-overlayCanvas.addEventListener('touchstart', e => { e.preventDefault(); onPointerDown(getTouchEvent(e)); }, {passive:false});
-overlayCanvas.addEventListener('touchmove', e => { e.preventDefault(); onPointerMove(getTouchEvent(e)); }, {passive:false});
-overlayCanvas.addEventListener('touchend', e => { e.preventDefault(); onPointerUp(getTouchEvent(e)); }, {passive:false});
-overlayCanvas.addEventListener('contextmenu', onContextMenu);
-
-function getTouchEvent(e) {
-  const t = e.touches[0] || e.changedTouches[0];
-  return { clientX: t.clientX, clientY: t.clientY };
+// ════════════════════════════════════════════════════
+// ZOOM & PAN
+// ════════════════════════════════════════════════════
+function zoom(delta, cx, cy) {
+  const wrap = document.getElementById('wrap');
+  const mx = cx ?? wrap.clientWidth/2;
+  const my = cy ?? wrap.clientHeight/2;
+  const newScale = Math.min(Math.max(scale + delta, 0.1), 10);
+  panX = mx - (mx - panX) * (newScale / scale);
+  panY = my - (my - panY) * (newScale / scale);
+  scale = newScale;
+  updateZoomDisplay();
+  redraw();
 }
 
-function getPos(e) {
-  const rect = overlayCanvas.getBoundingClientRect();
-  const scaleX = overlayCanvas.width / rect.width;
-  const scaleY = overlayCanvas.height / rect.height;
+function resetZoom() { scale = 1; panX = 0; panY = 0; updateZoomDisplay(); redraw(); }
+
+function updateZoomDisplay() {
+  const pct = Math.round(scale * 100) + '%';
+  document.getElementById('zoom-display').textContent = pct;
+  const ind = document.getElementById('zoom-indicator');
+  ind.textContent = pct;
+  ind.classList.add('show');
+  clearTimeout(ind._t);
+  ind._t = setTimeout(() => ind.classList.remove('show'), 1200);
+}
+
+// Canvas koordinatalarini world ga o'tkazish
+function toWorld(ex, ey) {
+  const rect = overlayC.getBoundingClientRect();
+  const sx2 = overlayC.width / rect.width;
+  const sy2 = overlayC.height / rect.height;
   return {
-    x: (e.clientX - rect.left) * scaleX,
-    y: (e.clientY - rect.top) * scaleY,
+    x: ((ex - rect.left) * sx2 - panX) / scale,
+    y: ((ey - rect.top) * sy2 - panY) / scale,
   };
 }
 
-function onPointerDown(e) {
-  if (currentTool === 'text') { placeTextInput(e); return; }
-  hideContextMenu();
-  const pos = getPos(e);
-  isDrawing = true;
-  startX = pos.x; startY = pos.y;
-  currentPoints = [pos];
-  currentStrokeId = crypto.randomUUID();
+// ════════════════════════════════════════════════════
+// CANVAS EVENTS
+// ════════════════════════════════════════════════════
+overlayC.addEventListener('mousedown', onDown);
+overlayC.addEventListener('mousemove', onMove);
+overlayC.addEventListener('mouseup', onUp);
+overlayC.addEventListener('mouseleave', onUp);
+overlayC.addEventListener('wheel', onWheel, { passive: false });
+overlayC.addEventListener('contextmenu', onCtx);
+overlayC.addEventListener('touchstart', e => { e.preventDefault(); onDown(e.touches[0]); }, { passive: false });
+overlayC.addEventListener('touchmove', e => { e.preventDefault(); onMove(e.touches[0]); }, { passive: false });
+overlayC.addEventListener('touchend', e => { e.preventDefault(); onUp(e.changedTouches[0]); }, { passive: false });
+
+document.addEventListener('keydown', onKey);
+document.addEventListener('keyup', e => { if(e.key===' ') { spaceDown=false; overlayC.style.cursor='crosshair'; } });
+
+function onWheel(e) {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? -0.08 : 0.08;
+  zoom(delta, e.clientX, e.clientY);
+}
+
+function onKey(e) {
+  if (!roomId) return;
+  if (e.key === ' ' && !e.target.matches('input,textarea')) { e.preventDefault(); spaceDown = true; overlayC.style.cursor = 'grab'; }
+  if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undo(); }
+  if (e.ctrlKey && e.key === 'y') { e.preventDefault(); redo(); }
+  if (e.key === 'Escape') { if(textEl){textEl.remove();textEl=null;} selectedId=null; redraw(); }
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    if(e.target.matches('input,textarea')) return;
+    if(selectedId) deleteSelected();
+  }
+  const map = { p:'pen', e:'eraser', s:'select', l:'line', r:'rect', c:'circle', t:'text' };
+  if (!e.ctrlKey && !e.altKey && !e.target.matches('input,textarea') && map[e.key]) setTool(map[e.key]);
+  if (e.key==='+' || e.key==='=') zoom(0.1);
+  if (e.key==='-') zoom(-0.1);
+}
+
+function onDown(e) {
+  const world = toWorld(e.clientX, e.clientY);
+
+  // Space + drag = pan
+  if (spaceDown || e.button === 1) {
+    isPanning = true;
+    panStart = { mx: e.clientX, my: e.clientY, px: panX, py: panY };
+    overlayC.style.cursor = 'grabbing';
+    return;
+  }
+
+  hideCtx();
+
+  if (tool === 'text') { placeText(world); return; }
+
+  if (tool === 'select') {
+    // Stroke tanlash
+    const hit = hitTest(world.x, world.y);
+    if (hit) {
+      selectedId = hit.id;
+      isDraggingStroke = true;
+      dragStrokeStart = { x: world.x, y: world.y };
+      dragStrokeOrigin = JSON.parse(JSON.stringify(hit));
+      redraw();
+      return;
+    } else {
+      selectedId = null;
+      redraw();
+    }
+    return;
+  }
+
+  drawing = true;
+  sx = world.x; sy = world.y;
+  pts = [{ x: world.x, y: world.y }];
+  strokeId = crypto.randomUUID();
+
   socket?.emit('stroke-start', {
-    tool: currentTool, color: currentColor, width: currentWidth,
-    opacity: currentOpacity, fillColor: fillEnabled ? currentColor : null,
-    strokeId: currentStrokeId,
+    tool, color, w: strokeW, opacity, fill: fillOn ? color : null, strokeId,
   });
 }
 
-function onPointerMove(e) {
-  const pos = getPos(e);
-  socket?.emit('cursor-move', { x: pos.x, y: pos.y });
-  if (!isDrawing) return;
-  if (currentTool === 'pen' || currentTool === 'eraser') {
-    currentPoints.push(pos);
-    socket?.emit('stroke-point', { x: pos.x, y: pos.y });
+function onMove(e) {
+  const world = toWorld(e.clientX, e.clientY);
+
+  // Cursor broadcast
+  socket?.emit('cursor-move', { x: world.x, y: world.y });
+
+  // Panning
+  if (isPanning && panStart) {
+    panX = panStart.px + (e.clientX - panStart.mx);
+    panY = panStart.py + (e.clientY - panStart.my);
+    redraw();
+    return;
   }
-  drawOverlay(pos);
+
+  // Stroke dragging
+  if (isDraggingStroke && selectedId) {
+    const dx = world.x - dragStrokeStart.x;
+    const dy = world.y - dragStrokeStart.y;
+    const s = strokes.find(s => s.id === selectedId);
+    if (s) {
+      const orig = dragStrokeOrigin;
+      if (orig.pts?.length) s.pts = orig.pts.map(p => ({ x: p.x+dx, y: p.y+dy }));
+      if (orig.shape) s.shape = { ...orig.shape, x1:(orig.shape.x1||0)+dx, y1:(orig.shape.y1||0)+dy, x2:(orig.shape.x2||0)+dx, y2:(orig.shape.y2||0)+dy, x:(orig.shape.x||0)+dx, y:(orig.shape.y||0)+dy };
+      redraw();
+    }
+    return;
+  }
+
+  if (!drawing) return;
+
+  if (tool === 'pen' || tool === 'eraser') {
+    // Smoothing: average last points
+    pts.push({ x: world.x, y: world.y });
+    socket?.emit('stroke-point', { x: world.x, y: world.y });
+  }
+
+  drawOverlay(world);
 }
 
-function onPointerUp(e) {
-  if (!isDrawing) return;
-  isDrawing = false;
-  const pos = getPos(e);
-  const shapeData = getShapeData(pos);
-  const strokeData = {
-    strokeId: currentStrokeId, tool: currentTool, points: currentPoints,
-    shapeData, color: currentColor, width: currentWidth,
-    opacity: currentOpacity, fillColor: fillEnabled ? currentColor : null,
+function onUp(e) {
+  overlayC.style.cursor = spaceDown ? 'grab' : tool==='select' ? 'default' : 'crosshair';
+
+  if (isPanning) { isPanning = false; panStart = null; return; }
+
+  if (isDraggingStroke && selectedId) {
+    isDraggingStroke = false;
+    const s = strokes.find(s => s.id === selectedId);
+    if (s) {
+      socket?.emit('stroke-move', { strokeId: selectedId, newPoints: s.pts, newShapeData: s.shape });
+    }
+    dragStrokeOrigin = null;
+    return;
+  }
+
+  if (!drawing) return;
+  drawing = false;
+
+  const world = toWorld(e.clientX || 0, e.clientY || 0);
+  const shape = getShape(world);
+  const zIdx = strokes.length;
+
+  const sdata = {
+    strokeId, tool, points: smoothPts(pts), shapeData: shape,
+    color, width: strokeW, opacity, fillColor: fillOn ? color : null, zIndex: zIdx,
   };
-  strokes.push({ ...strokeData, id: currentStrokeId, userId: currentUser?.userId });
-  socket?.emit('stroke-end', strokeData);
-  currentPoints = [];
-  octx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-  redrawAll();
+
+  strokes.push({ id: strokeId, tool, pts: smoothPts(pts), shape, color, w: strokeW, opacity, fill: fillOn ? color : null, zIdx, userId: me?.userId });
+  strokes.sort((a,b) => (a.zIdx||0)-(b.zIdx||0));
+  socket?.emit('stroke-end', sdata);
+  undoStack = []; // redo stack tozalash
+
+  pts = [];
+  octx.clearRect(0, 0, overlayC.width, overlayC.height);
+  redraw();
 }
 
-function getShapeData(pos) {
-  if (!['line','rect','circle','triangle','arrow'].includes(currentTool)) return null;
-  return { x1: startX, y1: startY, x2: pos.x, y2: pos.y };
+function getShape(pos) {
+  if (!['line','rect','circle','triangle','arrow'].includes(tool)) return null;
+  return { x1: sx, y1: sy, x2: pos.x, y2: pos.y };
 }
 
-// ════ DRAW ════
-function applyStyle(context, stroke) {
-  context.globalAlpha = stroke.opacity || 1;
-  context.strokeStyle = stroke.color || '#fff';
-  context.fillStyle = stroke.fillColor || stroke.color || '#fff';
-  context.lineWidth = stroke.width || 3;
-  context.lineCap = 'round';
-  context.lineJoin = 'round';
+// ════════════════════════════════════════════════════
+// STROKE SMOOTHING
+// ════════════════════════════════════════════════════
+function smoothPts(points, tension = 0.5) {
+  if (points.length < 4) return points;
+  const result = [];
+  for (let i = 0; i < points.length; i++) {
+    if (i === 0 || i === points.length - 1) { result.push(points[i]); continue; }
+    result.push({
+      x: points[i].x * (1 - tension) + (points[i-1].x + points[i+1].x) * tension / 2,
+      y: points[i].y * (1 - tension) + (points[i-1].y + points[i+1].y) * tension / 2,
+    });
+  }
+  return result;
 }
 
-function drawStroke(context, stroke) {
-  if (!stroke) return;
-  context.save();
-  applyStyle(context, stroke);
-  switch(stroke.tool) {
-    case 'pen': drawFreePen(context, stroke.points); break;
+// ════════════════════════════════════════════════════
+// HIT TEST (select tool)
+// ════════════════════════════════════════════════════
+function hitTest(wx, wy) {
+  // Tepadan pastga test (z-order)
+  for (let i = strokes.length - 1; i >= 0; i--) {
+    const s = strokes[i];
+    if (strokeHit(s, wx, wy)) return s;
+  }
+  return null;
+}
+
+function strokeHit(s, wx, wy) {
+  const THRESH = 10 / scale;
+  if (s.tool === 'pen' || s.tool === 'eraser') {
+    if (!s.pts?.length) return false;
+    for (let i = 1; i < s.pts.length; i++) {
+      if (distToSeg(wx, wy, s.pts[i-1], s.pts[i]) < THRESH) return true;
+    }
+    return false;
+  }
+  if (s.tool === 'image' && s.shape) {
+    const { x, y, width: w, height: h } = s.shape;
+    return wx >= x && wx <= x+w && wy >= y && wy <= y+h;
+  }
+  if (s.shape) {
+    const { x1=0, y1=0, x2=0, y2=0 } = s.shape;
+    const minX = Math.min(x1,x2)-THRESH, maxX = Math.max(x1,x2)+THRESH;
+    const minY = Math.min(y1,y2)-THRESH, maxY = Math.max(y1,y2)+THRESH;
+    return wx >= minX && wx <= maxX && wy >= minY && wy <= maxY;
+  }
+  if (s.tool === 'text' && s.shape) {
+    return Math.abs(wx - s.shape.x) < 100 && Math.abs(wy - s.shape.y) < 30;
+  }
+  return false;
+}
+
+function distToSeg(px, py, a, b) {
+  const dx = b.x-a.x, dy = b.y-a.y;
+  const len2 = dx*dx+dy*dy;
+  if (!len2) return Math.hypot(px-a.x, py-a.y);
+  const t = Math.max(0, Math.min(1, ((px-a.x)*dx+(py-a.y)*dy)/len2));
+  return Math.hypot(px-(a.x+t*dx), py-(a.y+t*dy));
+}
+
+// ════════════════════════════════════════════════════
+// DRAW
+// ════════════════════════════════════════════════════
+function applyCtxStyle(c, s) {
+  c.globalAlpha = s.opacity ?? 1;
+  c.strokeStyle = s.color || '#fff';
+  c.fillStyle = s.fill || s.color || '#fff';
+  c.lineWidth = (s.w || 3) / scale;
+  c.lineCap = 'round';
+  c.lineJoin = 'round';
+}
+
+function drawStroke(c, s) {
+  c.save();
+  applyCtxStyle(c, s);
+  switch(s.tool) {
+    case 'pen': drawPen(c, s.pts); break;
     case 'eraser':
-      context.globalCompositeOperation = 'destination-out';
-      context.globalAlpha = 1;
-      context.lineWidth = stroke.width * 3;
-      drawFreePen(context, stroke.points);
-      context.globalCompositeOperation = 'source-over';
+      c.globalCompositeOperation = 'destination-out';
+      c.globalAlpha = 1;
+      c.lineWidth = (s.w * 3) / scale;
+      drawPen(c, s.pts);
+      c.globalCompositeOperation = 'source-over';
       break;
-    case 'line': if (stroke.shapeData) drawLine(context, stroke.shapeData); break;
-    case 'rect': if (stroke.shapeData) drawRect(context, stroke.shapeData, stroke.fillColor); break;
-    case 'circle': if (stroke.shapeData) drawCircle(context, stroke.shapeData, stroke.fillColor); break;
-    case 'triangle': if (stroke.shapeData) drawTriangle(context, stroke.shapeData, stroke.fillColor); break;
-    case 'arrow': if (stroke.shapeData) drawArrow(context, stroke.shapeData); break;
+    case 'line': if(s.shape) { c.beginPath(); c.moveTo(s.shape.x1,s.shape.y1); c.lineTo(s.shape.x2,s.shape.y2); c.stroke(); } break;
+    case 'rect': if(s.shape) drawRect(c,s.shape,s.fill); break;
+    case 'circle': if(s.shape) drawCircle(c,s.shape,s.fill); break;
+    case 'triangle': if(s.shape) drawTriangle(c,s.shape,s.fill); break;
+    case 'arrow': if(s.shape) drawArrow(c,s.shape); break;
     case 'text':
-      if (stroke.shapeData && stroke.textContent) {
-        context.font = `${stroke.fontSize || 18}px 'DM Sans', sans-serif`;
-        context.fillStyle = stroke.color;
-        context.globalAlpha = stroke.opacity || 1;
-        context.fillText(stroke.textContent, stroke.shapeData.x, stroke.shapeData.y);
+      if(s.shape&&s.text) {
+        c.font = `${(s.fontSize||18)}px 'DM Sans',sans-serif`;
+        c.fillStyle = s.color; c.globalAlpha = s.opacity||1;
+        c.fillText(s.text, s.shape.x, s.shape.y);
       }
       break;
     case 'image':
-      if (stroke.imageData && stroke.shapeData) {
-        const img = new Image();
-        img.onload = () => context.drawImage(img, stroke.shapeData.x, stroke.shapeData.y, stroke.shapeData.width, stroke.shapeData.height);
-        img.src = stroke.imageData;
-        if (img.complete) context.drawImage(img, stroke.shapeData.x, stroke.shapeData.y, stroke.shapeData.width, stroke.shapeData.height);
+      if(s.imgData&&s.shape) {
+        const img = s._img || (s._img = new Image());
+        if (!s._loaded) {
+          img.onload = () => { s._loaded = true; redraw(); };
+          img.src = s.imgData;
+        } else {
+          c.globalAlpha = 1;
+          c.drawImage(img, s.shape.x, s.shape.y, s.shape.width, s.shape.height);
+        }
       }
       break;
   }
-  context.restore();
+  c.restore();
 }
 
-function drawFreePen(context, points) {
-  if (!points || points.length < 2) return;
-  context.beginPath();
-  context.moveTo(points[0].x, points[0].y);
-  for (let i = 1; i < points.length - 1; i++) {
-    const mx = (points[i].x + points[i+1].x) / 2;
-    const my = (points[i].y + points[i+1].y) / 2;
-    context.quadraticCurveTo(points[i].x, points[i].y, mx, my);
+function drawPen(c, points) {
+  if (!points?.length) return;
+  if (points.length === 1) {
+    c.beginPath(); c.arc(points[0].x, points[0].y, (c.lineWidth||1)/2, 0, Math.PI*2); c.fill(); return;
   }
-  context.lineTo(points[points.length-1].x, points[points.length-1].y);
-  context.stroke();
+  c.beginPath(); c.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length-1; i++) {
+    const mx = (points[i].x+points[i+1].x)/2, my = (points[i].y+points[i+1].y)/2;
+    c.quadraticCurveTo(points[i].x, points[i].y, mx, my);
+  }
+  c.lineTo(points[points.length-1].x, points[points.length-1].y);
+  c.stroke();
 }
 
-function drawLine(context, d) {
-  context.beginPath(); context.moveTo(d.x1, d.y1); context.lineTo(d.x2, d.y2); context.stroke();
+function drawRect(c, d, fill) {
+  const x=Math.min(d.x1,d.x2), y=Math.min(d.y1,d.y2), w=Math.abs(d.x2-d.x1), h=Math.abs(d.y2-d.y1);
+  c.beginPath(); c.rect(x,y,w,h);
+  if(fill) c.fill(); c.stroke();
 }
 
-function drawRect(context, d, fill) {
-  const x = Math.min(d.x1,d.x2), y = Math.min(d.y1,d.y2);
-  const w = Math.abs(d.x2-d.x1), h = Math.abs(d.y2-d.y1);
-  context.beginPath(); context.rect(x, y, w, h);
-  if (fill) context.fill(); context.stroke();
+function drawCircle(c, d, fill) {
+  const cx=(d.x1+d.x2)/2, cy=(d.y1+d.y2)/2, rx=Math.abs(d.x2-d.x1)/2, ry=Math.abs(d.y2-d.y1)/2;
+  c.beginPath(); c.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);
+  if(fill) c.fill(); c.stroke();
 }
 
-function drawCircle(context, d, fill) {
-  const cx = (d.x1+d.x2)/2, cy = (d.y1+d.y2)/2;
-  const rx = Math.abs(d.x2-d.x1)/2, ry = Math.abs(d.y2-d.y1)/2;
-  context.beginPath(); context.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2);
-  if (fill) context.fill(); context.stroke();
+function drawTriangle(c, d, fill) {
+  c.beginPath(); c.moveTo((d.x1+d.x2)/2,d.y1); c.lineTo(d.x2,d.y2); c.lineTo(d.x1,d.y2); c.closePath();
+  if(fill) c.fill(); c.stroke();
 }
 
-function drawTriangle(context, d, fill) {
-  context.beginPath();
-  context.moveTo((d.x1+d.x2)/2, d.y1);
-  context.lineTo(d.x2, d.y2); context.lineTo(d.x1, d.y2); context.closePath();
-  if (fill) context.fill(); context.stroke();
-}
-
-function drawArrow(context, d) {
-  const dx = d.x2-d.x1, dy = d.y2-d.y1;
-  const angle = Math.atan2(dy, dx);
-  const len = Math.sqrt(dx*dx+dy*dy);
-  const headLen = Math.min(20, len*0.3);
-  context.beginPath(); context.moveTo(d.x1, d.y1); context.lineTo(d.x2, d.y2); context.stroke();
-  context.beginPath();
-  context.moveTo(d.x2, d.y2);
-  context.lineTo(d.x2 - headLen*Math.cos(angle-Math.PI/6), d.y2 - headLen*Math.sin(angle-Math.PI/6));
-  context.moveTo(d.x2, d.y2);
-  context.lineTo(d.x2 - headLen*Math.cos(angle+Math.PI/6), d.y2 - headLen*Math.sin(angle+Math.PI/6));
-  context.stroke();
+function drawArrow(c, d) {
+  const dx=d.x2-d.x1, dy=d.y2-d.y1, angle=Math.atan2(dy,dx);
+  const len=Math.sqrt(dx*dx+dy*dy), hl=Math.min(20/scale, len*0.3);
+  c.beginPath(); c.moveTo(d.x1,d.y1); c.lineTo(d.x2,d.y2); c.stroke();
+  c.beginPath();
+  c.moveTo(d.x2,d.y2); c.lineTo(d.x2-hl*Math.cos(angle-Math.PI/6), d.y2-hl*Math.sin(angle-Math.PI/6));
+  c.moveTo(d.x2,d.y2); c.lineTo(d.x2-hl*Math.cos(angle+Math.PI/6), d.y2-hl*Math.sin(angle+Math.PI/6));
+  c.stroke();
 }
 
 function drawOverlay(pos) {
-  octx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+  octx.clearRect(0,0,overlayC.width,overlayC.height);
   octx.save();
-  octx.globalAlpha = currentOpacity;
-  octx.strokeStyle = currentColor;
-  octx.fillStyle = currentColor;
-  octx.lineWidth = currentWidth;
-  octx.lineCap = 'round'; octx.lineJoin = 'round';
-  const d = { x1: startX, y1: startY, x2: pos.x, y2: pos.y };
-  switch(currentTool) {
-    case 'pen': drawFreePen(octx, currentPoints); break;
-    case 'eraser':
-      octx.globalCompositeOperation = 'destination-out';
-      octx.lineWidth = currentWidth * 3;
-      drawFreePen(octx, currentPoints);
-      octx.globalCompositeOperation = 'source-over';
-      break;
-    case 'line': drawLine(octx, d); break;
-    case 'rect': drawRect(octx, d, fillEnabled ? currentColor : null); break;
-    case 'circle': drawCircle(octx, d, fillEnabled ? currentColor : null); break;
-    case 'triangle': drawTriangle(octx, d, fillEnabled ? currentColor : null); break;
-    case 'arrow': drawArrow(octx, d); break;
-  }
-  Object.values(remoteStrokes).forEach(rs => {
-    octx.save();
-    octx.globalAlpha = rs.opacity || 1;
-    octx.strokeStyle = rs.color;
-    octx.lineWidth = rs.width;
+  octx.translate(panX, panY);
+  octx.scale(scale, scale);
+
+  // Current user drawing
+  if (drawing && pos) {
+    octx.globalAlpha = opacity;
+    octx.strokeStyle = color;
+    octx.fillStyle = color;
+    octx.lineWidth = strokeW / scale;
     octx.lineCap = 'round'; octx.lineJoin = 'round';
-    drawFreePen(octx, rs.points);
+    const d = { x1: sx, y1: sy, x2: pos.x, y2: pos.y };
+    switch(tool) {
+      case 'pen': drawPen(octx, pts); break;
+      case 'eraser': octx.globalCompositeOperation='destination-out'; octx.lineWidth=(strokeW*3)/scale; drawPen(octx,pts); octx.globalCompositeOperation='source-over'; break;
+      case 'line': octx.beginPath(); octx.moveTo(d.x1,d.y1); octx.lineTo(d.x2,d.y2); octx.stroke(); break;
+      case 'rect': drawRect(octx,d,fillOn?color:null); break;
+      case 'circle': drawCircle(octx,d,fillOn?color:null); break;
+      case 'triangle': drawTriangle(octx,d,fillOn?color:null); break;
+      case 'arrow': drawArrow(octx,d); break;
+    }
+  }
+
+  // Remote strokes
+  Object.values(remoteDrawing).forEach(rd => {
+    octx.save();
+    octx.globalAlpha = rd.opacity||1; octx.strokeStyle = rd.color; octx.lineWidth = (rd.w||3)/scale;
+    octx.lineCap = 'round'; octx.lineJoin = 'round';
+    drawPen(octx, rd.pts);
     octx.restore();
   });
+
+  octx.restore();
+
+  // Selection highlight
+  if (selectedId) {
+    const s = strokes.find(s => s.id === selectedId);
+    if (s) drawSelectionHandle(s);
+  }
+}
+
+function drawSelectionHandle(s) {
+  const box = getStrokeBounds(s);
+  if (!box) return;
+  const { x, y, w, h } = box;
+
+  // Transform box ke screen
+  const sx2 = x * scale + panX, sy2 = y * scale + panY;
+  const sw = w * scale, sh = h * scale;
+  const pad = 8;
+
+  octx.save();
+  octx.strokeStyle = '#7c6dfa';
+  octx.lineWidth = 1.5;
+  octx.setLineDash([6, 3]);
+  octx.strokeRect(sx2 - pad, sy2 - pad, sw + pad*2, sh + pad*2);
+  octx.setLineDash([]);
+
+  // Handles
+  const handles = [
+    [sx2-pad, sy2-pad], [sx2+sw/2, sy2-pad], [sx2+sw+pad, sy2-pad],
+    [sx2-pad, sy2+sh/2], [sx2+sw+pad, sy2+sh/2],
+    [sx2-pad, sy2+sh+pad], [sx2+sw/2, sy2+sh+pad], [sx2+sw+pad, sy2+sh+pad],
+  ];
+  octx.fillStyle = '#7c6dfa';
+  handles.forEach(([hx,hy]) => { octx.beginPath(); octx.arc(hx,hy,4,0,Math.PI*2); octx.fill(); });
   octx.restore();
 }
 
-function redrawAll() {
-  ctx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+function getStrokeBounds(s) {
+  if (s.tool === 'image' && s.shape) return { x: s.shape.x, y: s.shape.y, w: s.shape.width, h: s.shape.height };
+  if (s.shape) {
+    const { x1=0, y1=0, x2=0, y2=0 } = s.shape;
+    return { x: Math.min(x1,x2), y: Math.min(y1,y2), w: Math.abs(x2-x1), h: Math.abs(y2-y1) };
+  }
+  if (s.pts?.length) {
+    const xs = s.pts.map(p=>p.x), ys = s.pts.map(p=>p.y);
+    const minX = Math.min(...xs), minY = Math.min(...ys);
+    return { x: minX, y: minY, w: Math.max(...xs)-minX, h: Math.max(...ys)-minY };
+  }
+  return null;
+}
+
+function redraw() {
+  ctx.clearRect(0, 0, mainC.width, mainC.height);
+  ctx.save();
+  ctx.translate(panX, panY);
+  ctx.scale(scale, scale);
   strokes.forEach(s => drawStroke(ctx, s));
+  ctx.restore();
+  drawOverlay();
 }
 
-function redrawOverlay() {
-  octx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-  Object.values(remoteStrokes).forEach(rs => {
-    octx.save();
-    octx.globalAlpha = rs.opacity || 1;
-    octx.strokeStyle = rs.color;
-    octx.lineWidth = rs.width;
-    octx.lineCap = 'round'; octx.lineJoin = 'round';
-    drawFreePen(octx, rs.points);
-    octx.restore();
-  });
-}
+// ════════════════════════════════════════════════════
+// TEXT TOOL
+// ════════════════════════════════════════════════════
+function placeText(world) {
+  if (textEl) textEl.remove();
+  const screenX = world.x * scale + panX;
+  const screenY = world.y * scale + panY;
+  const fs = Math.max(strokeW * 4, 16) * scale;
 
-// ════ TEXT ════
-function placeTextInput(e) {
-  if (textInput) textInput.remove();
-  const pos = getPos(e);
-  textInput = document.createElement('textarea');
-  textInput.style.cssText = `
-    position:absolute;left:${pos.x}px;top:${pos.y}px;
-    background:rgba(108,99,255,.15);border:1px dashed var(--accent);
-    color:${currentColor};font-size:${Math.max(currentWidth*4,16)}px;
-    font-family:'DM Sans',sans-serif;outline:none;resize:both;
-    min-width:120px;min-height:40px;padding:4px 8px;border-radius:6px;z-index:300;
+  textEl = document.createElement('textarea');
+  textEl.style.cssText = `
+    position:absolute;left:${screenX}px;top:${screenY}px;
+    background:rgba(124,109,250,.12);border:1px dashed #7c6dfa;
+    color:${color};font-size:${fs}px;font-family:'DM Sans',sans-serif;
+    outline:none;resize:both;min-width:120px;min-height:40px;
+    padding:4px 8px;border-radius:6px;z-index:350;pointer-events:all;
   `;
-  document.getElementById('canvas-wrap').appendChild(textInput);
-  textInput.focus();
-  textInput.addEventListener('blur', () => {
-    const text = textInput.value.trim();
-    if (text) {
-      const strokeId = crypto.randomUUID();
-      const shapeData = { x: pos.x, y: pos.y + Math.max(currentWidth*4,16) };
-      const strokeData = { strokeId, tool: 'text', points: [], shapeData, color: currentColor, width: currentWidth, opacity: currentOpacity, fillColor: null, fontSize: Math.max(currentWidth*4,16), textContent: text };
-      strokes.push({ ...strokeData, id: strokeId, userId: currentUser?.userId });
-      socket?.emit('stroke-end', strokeData);
-      redrawAll();
+  document.getElementById('wrap').appendChild(textEl);
+  textEl.focus();
+  textEl.addEventListener('blur', () => {
+    const txt = textEl.value.trim();
+    if (txt) {
+      const sid = crypto.randomUUID();
+      const shapeData = { x: world.x, y: world.y + Math.max(strokeW*4,16) };
+      const sdata = { strokeId: sid, tool:'text', points:[], shapeData, color, width: strokeW, opacity, fillColor: null, fontSize: Math.max(strokeW*4,16), textContent: txt, zIndex: strokes.length };
+      strokes.push({ id: sid, tool:'text', pts:[], shape: shapeData, color, w: strokeW, opacity, text: txt, fontSize: Math.max(strokeW*4,16), zIdx: strokes.length, userId: me?.userId });
+      socket?.emit('stroke-end', sdata);
+      redraw();
     }
-    textInput.remove(); textInput = null;
+    textEl.remove(); textEl = null;
   });
-  textInput.addEventListener('keydown', e => { if (e.key === 'Escape') { textInput.remove(); textInput = null; } });
+  textEl.addEventListener('keydown', e => { if(e.key==='Escape'){textEl.remove();textEl=null;} });
 }
 
-// ════ STICKY NOTES ════
-const NOTE_COLORS = ['#fef08a','#bbf7d0','#bfdbfe','#fecaca','#e9d5ff','#fed7aa'];
-
-function addStickyNote() {
-  const noteId = crypto.randomUUID();
-  const x = 100 + Math.random() * 200, y = 100 + Math.random() * 200;
-  const bgColor = NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)];
-  createNoteEl(noteId, x, y, '', bgColor, true);
-  socket?.emit('note-add', { noteId, x, y, content: '', bgColor, width: 200, height: 150 });
-}
-
-function createNoteEl(noteId, x, y, content, bgColor, editable) {
-  const el = document.createElement('div');
-  el.className = 'sticky-note';
-  el.dataset.noteId = noteId;
-  el.style.cssText = `left:${x}px;top:${y}px;background:${bgColor||'#fef08a'};width:200px;height:150px;pointer-events:all;`;
-  const header = document.createElement('div');
-  header.className = 'note-header';
-  const colorBtns = document.createElement('div');
-  colorBtns.className = 'note-color-btns';
-  NOTE_COLORS.forEach(c => {
-    const btn = document.createElement('div');
-    btn.className = 'note-color-btn';
-    btn.style.background = c;
-    btn.onclick = () => { el.style.background = c; };
-    colorBtns.appendChild(btn);
-  });
-  const delBtn = document.createElement('button');
-  delBtn.className = 'note-delete-btn';
-  delBtn.textContent = '×';
-  delBtn.onclick = () => { el.remove(); delete stickyNotes[noteId]; socket?.emit('note-delete', { noteId }); };
-  header.appendChild(colorBtns); header.appendChild(delBtn);
-  const ta = document.createElement('textarea');
-  ta.value = content || '';
-  ta.placeholder = 'Yozing...';
-  let saveTimeout;
-  ta.addEventListener('input', () => {
-    clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => {
-      const rect = el.getBoundingClientRect();
-      const wrap = document.getElementById('canvas-wrap').getBoundingClientRect();
-      socket?.emit('note-update', { noteId, content: ta.value, x: rect.left - wrap.left, y: rect.top - wrap.top });
-    }, 500);
-  });
-  el.appendChild(header); el.appendChild(ta);
-  document.getElementById('notes-layer').appendChild(el);
-  makeDraggable(el, noteId);
-  stickyNotes[noteId] = el;
-}
-
-function makeDraggable(el, noteId) {
-  let ox, oy, dragging = false;
-  el.addEventListener('mousedown', e => {
-    if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON' || e.target.className === 'note-color-btn') return;
-    dragging = true; ox = e.clientX - el.offsetLeft; oy = e.clientY - el.offsetTop; el.style.zIndex = 300;
-  });
-  document.addEventListener('mousemove', e => { if (!dragging) return; el.style.left = (e.clientX - ox) + 'px'; el.style.top = (e.clientY - oy) + 'px'; });
-  document.addEventListener('mouseup', () => {
-    if (dragging) { dragging = false; const ta = el.querySelector('textarea'); socket?.emit('note-update', { noteId, content: ta?.value || '', x: el.offsetLeft, y: el.offsetTop }); }
-  });
-}
-
-// ════ ACTIONS ════
+// ════════════════════════════════════════════════════
+// UNDO / REDO
+// ════════════════════════════════════════════════════
 function undo() {
-  if (!currentUser) return;
-  const myStrokes = strokes.filter(s => s.userId === currentUser.userId);
-  if (myStrokes.length === 0) return;
-  const last = myStrokes[myStrokes.length - 1];
+  if (!me) return;
+  const mine = strokes.filter(s => s.userId === me.userId);
+  if (!mine.length) return;
+  const last = mine[mine.length-1];
+  undoStack.push(last);
   strokes = strokes.filter(s => s.id !== last.id);
-  redrawAll();
+  if (selectedId === last.id) selectedId = null;
+  redraw();
   socket?.emit('undo');
 }
 
-function clearBoard() {
+function redo() {
+  if (!undoStack.length) return;
+  const s = undoStack.pop();
+  strokes.push(s);
+  strokes.sort((a,b) => (a.zIdx||0)-(b.zIdx||0));
+  redraw();
+  // Server ga ham qaytarish
+  socket?.emit('stroke-end', {
+    strokeId: s.id, tool: s.tool, points: s.pts, shapeData: s.shape,
+    color: s.color, width: s.w, opacity: s.opacity, fillColor: s.fill,
+    fontSize: s.fontSize, textContent: s.text, zIndex: s.zIdx,
+  });
+}
+
+// ════════════════════════════════════════════════════
+// SELECT TOOL ACTIONS
+// ════════════════════════════════════════════════════
+function deleteSelected() {
+  if (!selectedId) return;
+  strokes = strokes.filter(s => s.id !== selectedId);
+  socket?.emit('undo'); // server da ham o'chirish — real case da alohida event kerak
+  redraw();
+  selectedId = null;
+  hideCtx();
+}
+
+function bringFront() {
+  if (!selectedId) return;
+  const maxZ = Math.max(...strokes.map(s => s.zIdx||0)) + 1;
+  const s = strokes.find(s => s.id === selectedId);
+  if (s) { s.zIdx = maxZ; socket?.emit('stroke-zindex', { strokeId: selectedId, zIndex: maxZ }); strokes.sort((a,b)=>(a.zIdx||0)-(b.zIdx||0)); redraw(); }
+  hideCtx();
+}
+
+function sendBack() {
+  if (!selectedId) return;
+  const minZ = Math.min(...strokes.map(s => s.zIdx||0)) - 1;
+  const s = strokes.find(s => s.id === selectedId);
+  if (s) { s.zIdx = minZ; socket?.emit('stroke-zindex', { strokeId: selectedId, zIndex: minZ }); strokes.sort((a,b)=>(a.zIdx||0)-(b.zIdx||0)); redraw(); }
+  hideCtx();
+}
+
+// ════════════════════════════════════════════════════
+// CONTEXT MENU
+// ════════════════════════════════════════════════════
+function onCtx(e) {
+  e.preventDefault();
+  const world = toWorld(e.clientX, e.clientY);
+  ctxTarget = hitTest(world.x, world.y);
+  const menu = document.getElementById('ctx');
+  const hasTarget = !!ctxTarget;
+  document.getElementById('ctx-front').style.display = hasTarget ? 'flex' : 'none';
+  document.getElementById('ctx-back').style.display = hasTarget ? 'flex' : 'none';
+  document.getElementById('ctx-del').style.display = hasTarget ? 'flex' : 'none';
+  document.getElementById('ctx-sep2').style.display = hasTarget ? 'block' : 'none';
+  if (hasTarget) { selectedId = ctxTarget.id; redraw(); }
+  menu.style.display = 'block';
+  menu.style.left = e.clientX + 'px';
+  menu.style.top = e.clientY + 'px';
+}
+function hideCtx() { document.getElementById('ctx').style.display = 'none'; }
+function ctxUndo() { undo(); hideCtx(); }
+function ctxRedo() { redo(); hideCtx(); }
+document.addEventListener('click', e => { if(!e.target.closest('#ctx')) hideCtx(); });
+
+// ════════════════════════════════════════════════════
+// CLEAR
+// ════════════════════════════════════════════════════
+function clearAll() {
   if (!confirm('Barcha chizmalar o\'chiriladi. Davom etasizmi?')) return;
-  strokes = []; redrawAll(); socket?.emit('clear-board');
+  strokes = []; selectedId = null; undoStack = [];
+  redraw(); socket?.emit('clear-board'); hideCtx();
 }
 
-function downloadCanvas() {
-  const tempCanvas = document.createElement('canvas');
-  tempCanvas.width = mainCanvas.width; tempCanvas.height = mainCanvas.height;
-  const tCtx = tempCanvas.getContext('2d');
-  tCtx.fillStyle = '#1a1a24'; tCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-  tCtx.drawImage(mainCanvas, 0, 0);
-  const link = document.createElement('a');
-  link.download = `whiteboard-${currentRoomId}-${Date.now()}.png`;
-  link.href = tempCanvas.toDataURL('image/png');
-  link.click();
-}
-
-function handleImageUpload(e) {
+// ════════════════════════════════════════════════════
+// IMAGE
+// ════════════════════════════════════════════════════
+function loadImage(e) {
   const file = e.target.files[0]; if (!file) return;
   const reader = new FileReader();
-  reader.onload = (ev) => {
+  reader.onload = ev => {
     const img = new Image();
     img.onload = () => {
-      const maxW = 400, maxH = 300;
       let w = img.width, h = img.height;
-      if (w > maxW) { h = h * maxW / w; w = maxW; }
-      if (h > maxH) { w = w * maxH / h; h = maxH; }
-      const x = (mainCanvas.width - w) / 2, y = (mainCanvas.height - h) / 2;
-      const strokeId = crypto.randomUUID();
-      const data = { strokeId, x, y, width: w, height: h, imageData: ev.target.result };
-      strokes.push({ id: strokeId, tool: 'image', shapeData: { x, y, width: w, height: h }, imageData: ev.target.result });
-      socket?.emit('image-add', data); redrawAll();
+      if (w > imgMaxW) { h = h*imgMaxW/w; w = imgMaxW; }
+      if (h > imgMaxH) { w = w*imgMaxH/h; h = imgMaxH; }
+      // Canvas markaziga joylash (world koordinatada)
+      const wrap = document.getElementById('wrap');
+      const cx = (wrap.clientWidth/2 - panX) / scale;
+      const cy = (wrap.clientHeight/2 - panY) / scale;
+      const x = cx - w/2, y = cy - h/2;
+      const sid = crypto.randomUUID();
+      const zIdx = strokes.length;
+      const s = { id: sid, tool:'image', shape:{x,y,width:w,height:h}, imgData:ev.target.result, zIdx, userId: me?.userId, _img: img, _loaded: true };
+      strokes.push(s);
+      strokes.sort((a,b)=>(a.zIdx||0)-(b.zIdx||0));
+      socket?.emit('image-add', { strokeId: sid, x, y, width: w, height: h, imageData: ev.target.result, zIndex: zIdx });
+      redraw();
     };
     img.src = ev.target.result;
   };
   reader.readAsDataURL(file); e.target.value = '';
 }
 
-// ════ CURSORS ════
-function updateRemoteCursor({ userId, name, color, x, y }) {
-  let el = cursors[userId];
-  if (!el) {
-    el = document.createElement('div');
-    el.className = 'remote-cursor';
-    el.innerHTML = `<svg width="20" height="24" viewBox="0 0 20 24"><path d="M0 0L0 18L5 13L8 20L11 19L8 12L14 12Z" fill="${color}" stroke="rgba(0,0,0,.4)" stroke-width="1"/></svg><div class="cursor-label" style="background:${color}">${name}</div>`;
-    document.getElementById('cursors-layer').appendChild(el);
-    cursors[userId] = el;
-  }
-  el.style.left = x + 'px'; el.style.top = y + 'px';
+// ════════════════════════════════════════════════════
+// STICKY NOTES
+// ════════════════════════════════════════════════════
+const NOTE_COLS = ['#fef08a','#bbf7d0','#bfdbfe','#fecaca','#e9d5ff','#fed7aa'];
+
+function addNote() {
+  const sid = crypto.randomUUID();
+  const wrap = document.getElementById('wrap');
+  const x = (wrap.clientWidth/2 - panX)/scale - 100 + Math.random()*80;
+  const y = (wrap.clientHeight/2 - panY)/scale - 75 + Math.random()*80;
+  const bg = NOTE_COLS[Math.floor(Math.random()*NOTE_COLS.length)];
+  createNoteEl(sid, x, y, '', bg);
+  socket?.emit('note-add', { noteId: sid, x, y, content:'', bgColor: bg, width:200, height:150 });
 }
 
-function removeCursor(userId) { if (cursors[userId]) { cursors[userId].remove(); delete cursors[userId]; } }
+function createNoteEl(nid, wx, wy, content, bg) {
+  const el = document.createElement('div');
+  el.className = 'snote';
+  el.dataset.nid = nid;
 
-function addUserAvatar({ userId, name, color }) {
-  onlineUsers[userId] = { name, color };
-  const list = document.getElementById('avatar-list');
+  // World koordinatadan screen ga
+  const sx2 = wx * scale + panX;
+  const sy2 = wy * scale + panY;
+  el.style.cssText = `left:${sx2}px;top:${sy2}px;background:${bg||'#fef08a'};width:200px;height:150px;pointer-events:all;`;
+
+  const hdr = document.createElement('div');
+  hdr.className = 'snote-hdr';
+  const cols = document.createElement('div');
+  cols.className = 'snote-colors';
+  NOTE_COLS.forEach(c => {
+    const d = document.createElement('div');
+    d.className = 'snote-dot'; d.style.background = c;
+    d.onclick = () => el.style.background = c;
+    cols.appendChild(d);
+  });
+  const del = document.createElement('button');
+  del.className = 'snote-del'; del.textContent = '×';
+  del.onclick = () => { el.remove(); socket?.emit('note-delete', { noteId: nid }); };
+  hdr.appendChild(cols); hdr.appendChild(del);
+
+  const ta = document.createElement('textarea');
+  ta.value = content || ''; ta.placeholder = 'Yozing...';
+  let t;
+  ta.addEventListener('input', () => {
+    clearTimeout(t);
+    t = setTimeout(() => {
+      const r = el.getBoundingClientRect();
+      const wr = document.getElementById('wrap').getBoundingClientRect();
+      const wxNew = (r.left - wr.left - panX) / scale;
+      const wyNew = (r.top - wr.top - panY) / scale;
+      socket?.emit('note-update', { noteId: nid, content: ta.value, x: wxNew, y: wyNew });
+    }, 500);
+  });
+
+  el.appendChild(hdr); el.appendChild(ta);
+  document.getElementById('notes-layer').appendChild(el);
+  makeDrag(el, nid);
+}
+
+function makeDrag(el, nid) {
+  let ox, oy, drag = false;
+  el.addEventListener('mousedown', e => {
+    if (e.target.tagName==='TEXTAREA'||e.target.tagName==='BUTTON'||e.target.className==='snote-dot') return;
+    drag = true; ox = e.clientX - el.offsetLeft; oy = e.clientY - el.offsetTop;
+    el.style.zIndex = 400;
+  });
+  document.addEventListener('mousemove', e => { if(!drag) return; el.style.left=(e.clientX-ox)+'px'; el.style.top=(e.clientY-oy)+'px'; });
+  document.addEventListener('mouseup', () => {
+    if (!drag) return; drag = false;
+    const r = el.getBoundingClientRect();
+    const wr = document.getElementById('wrap').getBoundingClientRect();
+    const wx = (r.left - wr.left - panX) / scale;
+    const wy = (r.top - wr.top - panY) / scale;
+    socket?.emit('note-update', { noteId: nid, content: el.querySelector('textarea')?.value||'', x: wx, y: wy });
+  });
+}
+
+// ════════════════════════════════════════════════════
+// CHAT
+// ════════════════════════════════════════════════════
+function toggleChat() {
+  chatOpen = !chatOpen;
+  document.getElementById('chat-panel').classList.toggle('open', chatOpen);
+  document.getElementById('chat-btn').classList.toggle('on', chatOpen);
+  if (chatOpen) { unreadCount = 0; updateBadge(); document.getElementById('chat-input').focus(); }
+}
+
+function sendChat() {
+  const inp = document.getElementById('chat-input');
+  const text = inp.value.trim();
+  if (!text || !socket) return;
+  socket.emit('chat-message', { text });
+  inp.value = '';
+}
+
+document.getElementById('chat-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+});
+
+function appendMsg(msg, scroll = true) {
+  const isMine = msg.userId === me?.userId;
+  const div = document.createElement('div');
+  div.className = 'cmsg' + (isMine ? ' mine' : '');
+
+  const time = new Date(msg.createdAt).toLocaleTimeString('uz', { hour:'2-digit', minute:'2-digit' });
+  div.innerHTML = `
+    <div class="cmsg-meta">
+      <div class="cmsg-dot" style="background:${msg.color}"></div>
+      <span class="cmsg-name">${msg.name}</span>
+      <span class="cmsg-time">${time}</span>
+    </div>
+    <div class="cmsg-text">${escHtml(msg.text)}</div>
+  `;
+
+  document.getElementById('chat-msgs').appendChild(div);
+  if (scroll) document.getElementById('chat-msgs').scrollTop = 99999;
+
+  if (!chatOpen && !isMine) { unreadCount++; updateBadge(); }
+}
+
+function updateBadge() {
+  const b = document.getElementById('chat-badge');
+  b.textContent = unreadCount > 9 ? '9+' : unreadCount;
+  b.classList.toggle('show', unreadCount > 0 && !chatOpen);
+}
+
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
+
+// ════════════════════════════════════════════════════
+// REACTIONS
+// ════════════════════════════════════════════════════
+function toggleReactionPicker() {
+  const p = document.getElementById('reaction-picker');
+  p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
+}
+
+function sendReaction(emoji) {
+  const wrap = document.getElementById('wrap');
+  const x = wrap.clientWidth/2 + (Math.random()-0.5)*200;
+  const y = wrap.clientHeight/2 + (Math.random()-0.5)*100;
+  showReaction(x, y, emoji);
+  socket?.emit('reaction', { emoji, x, y });
+  document.getElementById('reaction-picker').style.display = 'none';
+}
+
+function showReaction(x, y, emoji) {
+  const el = document.createElement('div');
+  el.className = 'reaction-float';
+  el.textContent = emoji;
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  document.getElementById('reactions-layer').appendChild(el);
+  setTimeout(() => el.remove(), 2600);
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#reaction-picker') && !e.target.closest('.tb[data-tip="Reaktsiya"]')) {
+    document.getElementById('reaction-picker').style.display = 'none';
+  }
+});
+
+// ════════════════════════════════════════════════════
+// RENAME
+// ════════════════════════════════════════════════════
+function openRename() {
+  document.getElementById('rename-input').value = me?.name || '';
+  document.getElementById('rename-modal').classList.add('show');
+  document.getElementById('rename-input').focus();
+}
+function closeRename() { document.getElementById('rename-modal').classList.remove('show'); }
+function confirmRename() {
+  const name = document.getElementById('rename-input').value.trim();
+  if (!name) return;
+  if (me) me.name = name;
+  localStorage.setItem('wb-name', name);
+  socket?.emit('rename', { name });
+  closeRename();
+  toast('Ism o\'zgartirildi: ' + name);
+}
+document.getElementById('rename-input').addEventListener('keydown', e => { if(e.key==='Enter') confirmRename(); if(e.key==='Escape') closeRename(); });
+
+// ════════════════════════════════════════════════════
+// EXPORT
+// ════════════════════════════════════════════════════
+function exportPNG() {
+  const tmp = document.createElement('canvas');
+  tmp.width = mainC.width; tmp.height = mainC.height;
+  const tc = tmp.getContext('2d');
+  tc.fillStyle = '#14141e'; tc.fillRect(0,0,tmp.width,tmp.height);
+  tc.drawImage(mainC, 0, 0);
+  const a = document.createElement('a');
+  a.download = `whiteboard-${roomId}-${Date.now()}.png`;
+  a.href = tmp.toDataURL('image/png');
+  a.click();
+  toast('PNG yuklandi!');
+}
+
+function exportPDF() {
+  try {
+    const { jsPDF } = window.jspdf;
+    const tmp = document.createElement('canvas');
+    tmp.width = mainC.width; tmp.height = mainC.height;
+    const tc = tmp.getContext('2d');
+    tc.fillStyle = '#ffffff'; tc.fillRect(0,0,tmp.width,tmp.height);
+    // Oq fon uchun qayta chizish
+    tc.save(); tc.translate(panX,panY); tc.scale(scale,scale);
+    strokes.forEach(s => {
+      if(s.tool !== 'eraser') drawStroke(tc, s);
+    });
+    tc.restore();
+
+    const imgData = tmp.toDataURL('image/jpeg', 0.95);
+    const pdf = new jsPDF({
+      orientation: tmp.width > tmp.height ? 'landscape' : 'portrait',
+      unit: 'px',
+      format: [tmp.width, tmp.height],
+    });
+    pdf.addImage(imgData, 'JPEG', 0, 0, tmp.width, tmp.height);
+    pdf.save(`whiteboard-${roomId}-${Date.now()}.pdf`);
+    toast('PDF yuklandi!');
+  } catch(e) {
+    console.error('PDF error:', e);
+    toast('PDF xatosi — PNG ishlatib ko\'ring');
+  }
+}
+
+// ════════════════════════════════════════════════════
+// USERS & CURSORS
+// ════════════════════════════════════════════════════
+function addAvatar({ userId, name, color: c }) {
+  onlineUsers[userId] = { name, color: c };
   if (document.querySelector(`[data-uid="${userId}"]`)) return;
   const el = document.createElement('div');
-  el.className = 'user-avatar'; el.dataset.uid = userId;
-  el.style.background = color; el.textContent = name[0].toUpperCase(); el.title = name;
-  list.appendChild(el);
+  el.className = 'uav'; el.dataset.uid = userId;
+  el.style.background = c; el.textContent = name[0].toUpperCase();
+  el.title = name; el.onclick = () => openRename();
+  document.getElementById('avatar-list').appendChild(el);
 }
 
-function removeUserAvatar(userId) { const el = document.querySelector(`[data-uid="${userId}"]`); if (el) el.remove(); delete onlineUsers[userId]; }
-
-function onContextMenu(e) {
-  e.preventDefault();
-  const menu = document.getElementById('ctx-menu');
-  menu.style.display = 'block'; menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px';
+function removeAvatar(uid) {
+  const el = document.querySelector(`[data-uid="${uid}"]`);
+  if (el) el.remove(); delete onlineUsers[uid];
 }
 
-function hideContextMenu() { document.getElementById('ctx-menu').style.display = 'none'; }
-document.addEventListener('click', hideContextMenu);
-
-function copyRoomLink() {
-  const url = `${window.location.origin}${window.location.pathname}?room=${currentRoomId}`;
-  navigator.clipboard.writeText(url).then(() => showToast('🔗 Link nusxalandi!'));
+function updateAvatarTip(uid, name) {
+  const el = document.querySelector(`[data-uid="${uid}"]`);
+  if (el) el.title = name;
 }
 
-function showToast(msg) {
-  const toast = document.getElementById('toast');
-  toast.textContent = msg; toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 2500);
+function updateCursor({ userId, name, color: c, x, y }) {
+  // World dan screen ga
+  const sx2 = x * scale + panX;
+  const sy2 = y * scale + panY;
+  let el = remoteCursors[userId];
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'rcursor';
+    el.innerHTML = `<svg width="18" height="22" viewBox="0 0 18 22"><path d="M0 0L0 16L4.5 12L7 18L10 17L7.5 11L13 11Z" fill="${c}" stroke="rgba(0,0,0,.4)" stroke-width="1"/></svg><div class="rcursor-label" style="background:${c}">${name}</div>`;
+    document.getElementById('cursors-layer').appendChild(el);
+    remoteCursors[userId] = el;
+  }
+  el.style.left = sx2 + 'px';
+  el.style.top = sy2 + 'px';
 }
 
-document.addEventListener('keydown', e => {
-  if (!currentRoomId) return;
-  if (e.ctrlKey && e.key === 'z') { undo(); return; }
-  if (e.key === 'Escape') { if (textInput) { textInput.remove(); textInput = null; } }
-  const tools = { p:'pen', e:'eraser', l:'line', r:'rect', c:'circle', t:'text', s:'select' };
-  if (!e.ctrlKey && !e.altKey && tools[e.key]) setTool(tools[e.key]);
-});
+function removeCursor(uid) { if(remoteCursors[uid]){remoteCursors[uid].remove();delete remoteCursors[uid];} }
+
+// ════════════════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════════════════
+function copyLink() {
+  const url = `${location.origin}${location.pathname}?room=${roomId}`;
+  navigator.clipboard.writeText(url).then(() => toast('🔗 Link nusxalandi!'));
+}
+
+function toast(msg, dur=2500) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), dur);
+}
 </script>
 </body>
 </html>
