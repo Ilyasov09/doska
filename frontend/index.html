@@ -1056,12 +1056,50 @@ function onDown(e) {
   if(spaceDown||e.button===1){isPanning=true;panStart={mx:e.clientX,my:e.clientY,px:panX,py:panY};overlayC.style.cursor='grabbing';return}
   hideCtx();
   if(tool==='text'){placeText(world);return}
+
   if(tool==='select'){
+    // Avval resize handle tekshirish (image uchun)
+    if(selectedId){
+      const s=curStrokes().find(s=>s.id===selectedId);
+      if(s&&s.tool==='image'){
+        const h=getResizeHandle(s,world.x,world.y);
+        if(h){
+          resizing={strokeId:s.id,handle:h,startX:world.x,startY:world.y,origShape:{...s.shape}};
+          overlayC.style.cursor=getResizeCursor(h);
+          return;
+        }
+      }
+    }
     const hit=hitTest(world.x,world.y);
-    if(hit){selectedId=hit.id;isDragging=true;dragStart={x:world.x,y:world.y};dragOrigin=JSON.parse(JSON.stringify(hit));redraw()}
-    else{selectedId=null;redraw()}
+    if(hit){
+      // Ustma-ust elementda bosilganda avtomatik tepaga chiqarish
+      const maxZ=Math.max(...curStrokes().map(s=>s.zIdx||0));
+      if((hit.zIdx||0)<maxZ){
+        hit.zIdx=maxZ+1;
+        socket?.emit('stroke-zindex',{strokeId:hit.id,zIndex:hit.zIdx});
+        curPage().strokes.sort((a,b)=>(a.zIdx||0)-(b.zIdx||0));
+      }
+      selectedId=hit.id;isDragging=true;dragStart={x:world.x,y:world.y};dragOrigin=JSON.parse(JSON.stringify(hit));redraw();
+    } else {selectedId=null;redraw()}
     return;
   }
+
+  // Eraser: chiziq o'chirish emas, element o'chirish
+  if(tool==='eraser'){
+    const hit=hitTest(world.x,world.y);
+    if(hit){
+      curPage().strokes=curStrokes().filter(s=>s.id!==hit.id);
+      if(selectedId===hit.id) selectedId=null;
+      socket?.emit('undo'); // server da oxirgisini o'chiradi — yetarli emas, keyinroq stroke-delete event kerak
+      redraw();updateThumb(currentPageIdx);
+    }
+    // Eraser chiziq sifatida ham ishlaydi (pastda drawing=true)
+    drawing=true;sx=world.x;sy=world.y;pts=[{x:world.x,y:world.y}];
+    strokeId=crypto.randomUUID();
+    socket?.emit('stroke-start',{tool,color:penColor,w:strokeW,opacity,fill:null,strokeId});
+    return;
+  }
+
   drawing=true;sx=world.x;sy=world.y;pts=[{x:world.x,y:world.y}];
   strokeId=crypto.randomUUID();
   socket?.emit('stroke-start',{tool,color:penColor,w:strokeW,opacity,fill:fillOn?penColor:null,strokeId});
@@ -1070,13 +1108,40 @@ function onDown(e) {
 function onMove(e) {
   const world=toWorld(e.clientX,e.clientY);
   socket?.emit('cursor-move',{x:world.x,y:world.y});
+
+  // Resize handle cursor ko'rsatish
+  if(tool==='select'&&selectedId&&!isDragging&&!resizing){
+    const s=curStrokes().find(s=>s.id===selectedId);
+    if(s&&s.tool==='image'){
+      const h=getResizeHandle(s,world.x,world.y);
+      overlayC.style.cursor=h?getResizeCursor(h):'move';
+    }
+  }
+
   if(isPanning&&panStart){
     panX=panStart.px+(e.clientX-panStart.mx);
     panY=panStart.py+(e.clientY-panStart.my);
-    redraw();
-    if(rulerOn) drawRulers();
+    redraw();if(rulerOn) drawRulers();return;
+  }
+
+  // Image resize
+  if(resizing){
+    const s=curStrokes().find(s=>s.id===resizing.strokeId);
+    if(s&&s.shape){
+      const dx=world.x-resizing.startX, dy=world.y-resizing.startY;
+      const o=resizing.origShape;
+      let{x,y,width,height}=o;
+      const h=resizing.handle;
+      if(h.includes('e')) width=Math.max(20,o.width+dx);
+      if(h.includes('s')) height=Math.max(20,o.height+dy);
+      if(h.includes('w')){x=o.x+dx;width=Math.max(20,o.width-dx)}
+      if(h.includes('n')){y=o.y+dy;height=Math.max(20,o.height-dy)}
+      s.shape={x,y,width,height};
+      redraw();
+    }
     return;
   }
+
   if(isDragging&&selectedId){
     const dx=world.x-dragStart.x, dy=world.y-dragStart.y;
     const s=curStrokes().find(s=>s.id===selectedId);
@@ -1088,6 +1153,7 @@ function onMove(e) {
     }
     return;
   }
+
   if(!drawing) return;
   if(tool==='pen'||tool==='eraser'){pts.push({x:world.x,y:world.y});socket?.emit('stroke-point',{x:world.x,y:world.y})}
   drawOverlay(world);
@@ -1096,6 +1162,17 @@ function onMove(e) {
 function onUp(e) {
   overlayC.style.cursor=spaceDown?'grab':tool==='select'?'default':'crosshair';
   if(isPanning){isPanning=false;panStart=null;return}
+
+  // Image resize tugadi — serverga saqlash
+  if(resizing){
+    const s=curStrokes().find(s=>s.id===resizing.strokeId);
+    if(s?.shape){
+      socket?.emit('image-resize',{strokeId:resizing.strokeId,x:s.shape.x,y:s.shape.y,width:s.shape.width,height:s.shape.height});
+      updateThumb(currentPageIdx);
+    }
+    resizing=null;overlayC.style.cursor='default';return;
+  }
+
   if(isDragging&&selectedId){
     isDragging=false;
     const s=curStrokes().find(s=>s.id===selectedId);
@@ -1141,6 +1218,30 @@ function strokeHit(s,wx,wy){
   return false;
 }
 function distSeg(px,py,a,b){const dx=b.x-a.x,dy=b.y-a.y,l2=dx*dx+dy*dy;if(!l2) return Math.hypot(px-a.x,py-a.y);const t=Math.max(0,Math.min(1,((px-a.x)*dx+(py-a.y)*dy)/l2));return Math.hypot(px-(a.x+t*dx),py-(a.y+t*dy))}
+
+// ════ RESIZE STATE ════
+let resizing = null; // { strokeId, handle, startX, startY, origShape }
+
+// Resize handle larni qaytarish (image uchun)
+function getResizeHandle(s, wx, wy) {
+  if(!s.shape) return null;
+  const{x,y,width:w,height:h}=s.shape;
+  const T=10/scale; // threshold px
+  const handles={
+    'nw':[x,y],'n':[x+w/2,y],'ne':[x+w,y],
+    'w':[x,y+h/2],              'e':[x+w,y+h/2],
+    'sw':[x,y+h],'s':[x+w/2,y+h],'se':[x+w,y+h],
+  };
+  for(const[name,[hx,hy]] of Object.entries(handles)){
+    if(Math.hypot(wx-hx,wy-hy)<T*1.5) return name;
+  }
+  return null;
+}
+
+function getResizeCursor(handle){
+  const map={n:'n-resize',s:'s-resize',e:'e-resize',w:'w-resize',ne:'ne-resize',nw:'nw-resize',se:'se-resize',sw:'sw-resize'};
+  return map[handle]||'move';
+}
 
 // ════ DRAW ════
 function applyStyle(c,s){
@@ -1203,11 +1304,26 @@ function drawOverlay(pos) {
 
 function drawSel(s){
   const b=getBounds(s);if(!b) return;
-  const{x,y,w,h}=b;const sx2=x*scale+panX,sy2=y*scale+panY,sw=w*scale,sh=h*scale,pad=8;
+  const{x,y,w,h}=b;const sx2=x*scale+panX,sy2=y*scale+panY,sw=w*scale,sh=h*scale,pad=s.tool==='image'?0:8;
   octx.save();octx.strokeStyle='#7c6dfa';octx.lineWidth=1.5;octx.setLineDash([5,3]);
   octx.strokeRect(sx2-pad,sy2-pad,sw+pad*2,sh+pad*2);octx.setLineDash([]);
-  octx.fillStyle='#7c6dfa';
-  [[sx2-pad,sy2-pad],[sx2+sw/2,sy2-pad],[sx2+sw+pad,sy2-pad],[sx2-pad,sy2+sh/2],[sx2+sw+pad,sy2+sh/2],[sx2-pad,sy2+sh+pad],[sx2+sw/2,sy2+sh+pad],[sx2+sw+pad,sy2+sh+pad]].forEach(([hx,hy])=>{octx.beginPath();octx.arc(hx,hy,4,0,Math.PI*2);octx.fill()});
+
+  // Image uchun resize handle lar (8 ta), boshqalar uchun faqat corner
+  const isImg=s.tool==='image';
+  const handles=isImg?[
+    [sx2,sy2],[sx2+sw/2,sy2],[sx2+sw,sy2],
+    [sx2,sy2+sh/2],[sx2+sw,sy2+sh/2],
+    [sx2,sy2+sh],[sx2+sw/2,sy2+sh],[sx2+sw,sy2+sh],
+  ]:[
+    [sx2-pad,sy2-pad],[sx2+sw+pad,sy2-pad],
+    [sx2-pad,sy2+sh+pad],[sx2+sw+pad,sy2+sh+pad],
+  ];
+
+  octx.fillStyle='#fff';octx.strokeStyle='#7c6dfa';octx.lineWidth=1.5;
+  handles.forEach(([hx,hy])=>{
+    octx.beginPath();octx.arc(hx,hy,isImg?5:4,0,Math.PI*2);
+    octx.fill();octx.stroke();
+  });
   octx.restore();
 }
 
