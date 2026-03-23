@@ -689,8 +689,6 @@ const strokeLocks = {}; // strokeId -> { userId, color, name }
 let myLock = null; // Men hozir lock qilgan strokeId
 
 // Lock tizimi
-const strokeLocks = {}; // strokeId -> { userId, color, name }
-let myLock = null; // Men hozir lock qilgan strokeId
 
 // Batch stroke buffer
 let batchBuffer=[];
@@ -881,30 +879,7 @@ function connectSocket(id,preferredName){
   });
 
   // ── Lock events ──────────────────────────────────────────────────────────
-  socket.on('stroke-locked',({strokeId,userId,color,name})=>{
-    strokeLocks[strokeId]={userId,color,name};
-    renderLockOverlays();
-  });
-  socket.on('stroke-unlocked',({strokeId,newPoints,newShapeData})=>{
-    delete strokeLocks[strokeId];
-    // Final pozitsiyani qabul qilish
-    if(newPoints!==undefined||newShapeData!==undefined){
-      const s=curStrokes().find(s=>s.id===strokeId);
-      if(s){
-        if(newPoints!==undefined) s.pts=newPoints;
-        if(newShapeData!==undefined) s.shape=newShapeData;
-        redraw();updateThumb(currentPageIdx);
-      }
-    }
-    renderLockOverlays();
-  });
-  socket.on('strokes-unlocked',({strokeIds})=>{
-    strokeIds.forEach(sid=>delete strokeLocks[sid]);
-    renderLockOverlays();
-  });
-  socket.on('stroke-lock-denied',({strokeId,lockedBy,lockedByColor})=>{
-    const u=onlineUsers[lockedBy];
-    toast(`⛔ ${u?.name||'Boshqa kishi'} bu elementni ishlatmoqda`);
+      toast(`⛔ ${u?.name||'Boshqa kishi'} bu elementni ishlatmoqda`);
     // Harakatni bekor qilish
     selectedId=null;isDragging=false;resizing=null;
     redraw();
