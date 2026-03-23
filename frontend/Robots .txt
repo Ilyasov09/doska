@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://doska-zeta.vercel.app/sitemap.xml
+Sitemap: https://dekuboard.vercel.app/sitemap.xml
