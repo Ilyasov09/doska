@@ -45,10 +45,7 @@ const initDB = async () => {
       )
     `);
 
-    // z_index ustunini qo'shish (agar mavjud bo'lmasa)
-    await client.query(`
-      ALTER TABLE strokes ADD COLUMN IF NOT EXISTS z_index INTEGER DEFAULT 0
-    `);
+    await client.query(`ALTER TABLE strokes ADD COLUMN IF NOT EXISTS z_index INTEGER DEFAULT 0`);
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS sticky_notes (
@@ -78,10 +75,25 @@ const initDB = async () => {
       )
     `);
 
+    // Faoliyat tarixi
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS activity_log (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        room_id VARCHAR(12) REFERENCES rooms(id) ON DELETE CASCADE,
+        user_id VARCHAR(36) NOT NULL,
+        user_name VARCHAR(50),
+        user_color VARCHAR(7),
+        action VARCHAR(50) NOT NULL,
+        detail TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_strokes_room ON strokes(room_id);
       CREATE INDEX IF NOT EXISTS idx_notes_room ON sticky_notes(room_id);
       CREATE INDEX IF NOT EXISTS idx_chat_room ON chat_messages(room_id);
+      CREATE INDEX IF NOT EXISTS idx_activity_room ON activity_log(room_id, created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_rooms_last_active ON rooms(last_active);
     `);
 
