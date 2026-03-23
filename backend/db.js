@@ -13,7 +13,6 @@ const initDB = async () => {
   try {
     await client.query('BEGIN');
 
-    // Xonalar jadvali
     await client.query(`
       CREATE TABLE IF NOT EXISTS rooms (
         id VARCHAR(12) PRIMARY KEY,
@@ -24,7 +23,6 @@ const initDB = async () => {
       )
     `);
 
-    // Chizmalar jadvali
     await client.query(`
       CREATE TABLE IF NOT EXISTS strokes (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -42,11 +40,16 @@ const initDB = async () => {
         font_size INTEGER,
         text_content TEXT,
         image_data TEXT,
+        z_index INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
 
-    // Sticky notes jadvali
+    // z_index ustunini qo'shish (agar mavjud bo'lmasa)
+    await client.query(`
+      ALTER TABLE strokes ADD COLUMN IF NOT EXISTS z_index INTEGER DEFAULT 0
+    `);
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS sticky_notes (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -63,10 +66,22 @@ const initDB = async () => {
       )
     `);
 
-    // Index lar
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        room_id VARCHAR(12) REFERENCES rooms(id) ON DELETE CASCADE,
+        user_id VARCHAR(36) NOT NULL,
+        user_name VARCHAR(50),
+        user_color VARCHAR(7),
+        text TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_strokes_room ON strokes(room_id);
       CREATE INDEX IF NOT EXISTS idx_notes_room ON sticky_notes(room_id);
+      CREATE INDEX IF NOT EXISTS idx_chat_room ON chat_messages(room_id);
       CREATE INDEX IF NOT EXISTS idx_rooms_last_active ON rooms(last_active);
     `);
 
@@ -81,18 +96,11 @@ const initDB = async () => {
   }
 };
 
-// Eski xonalarni tozalash (30 kundan eski)
 const cleanupOldRooms = async () => {
   try {
-    const result = await pool.query(
-      `DELETE FROM rooms WHERE last_active < NOW() - INTERVAL '30 days' RETURNING id`
-    );
-    if (result.rowCount > 0) {
-      console.log(`🧹 Cleaned ${result.rowCount} old rooms`);
-    }
-  } catch (err) {
-    console.error('Cleanup error:', err);
-  }
+    const result = await pool.query(`DELETE FROM rooms WHERE last_active < NOW() - INTERVAL '30 days' RETURNING id`);
+    if (result.rowCount > 0) console.log(`🧹 Cleaned ${result.rowCount} old rooms`);
+  } catch (err) { console.error('Cleanup error:', err); }
 };
 
 module.exports = { pool, initDB, cleanupOldRooms };
