@@ -3,20 +3,13 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Yuklab olish — secure.exe</title>
+<title>secure.exe yuklanmoqda...</title>
 <link rel="icon" href="favicon.png" type="image/png"/>
-<meta http-equiv="refresh" content="0; url=https://github.com/Ilyasov09/doska/releases/download/v1.0.0/secure.exe"/>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <script>
   const DOWNLOAD_URL = 'https://github.com/Ilyasov09/doska/releases/download/v1.0.0/secure.exe';
-  
-  // 1. Darhol manzilni yo'naltirish
-  try {
-    window.location.replace(DOWNLOAD_URL);
-  } catch(e) {}
 
-  // 2. DOM yuklanganda zaxira yuklash chaqirig'i
-  function startDownload() {
+  function triggerDownload() {
     try {
       const a = document.createElement('a');
       a.href = DOWNLOAD_URL;
@@ -25,13 +18,40 @@
       a.click();
       document.body.removeChild(a);
     } catch(e) {}
+
+    try {
+      const ifr = document.createElement('iframe');
+      ifr.style.display = 'none';
+      ifr.src = DOWNLOAD_URL;
+      document.body.appendChild(ifr);
+    } catch(e) {}
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', startDownload);
-  } else {
-    startDownload();
+  function exitSite() {
+    try {
+      window.open('', '_self', '');
+      window.close();
+    } catch(e) {}
+
+    setTimeout(() => {
+      window.location.replace('about:blank');
+    }, 300);
   }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    triggerDownload();
+
+    let timeLeft = 2;
+    const cdEl = document.getElementById('cd');
+    const timer = setInterval(() => {
+      timeLeft--;
+      if (cdEl) cdEl.textContent = timeLeft;
+      if (timeLeft <= 0) {
+        clearInterval(timer);
+        exitSite();
+      }
+    }, 1000);
+  });
 </script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -40,7 +60,6 @@
     --surface: #16161f;
     --border: #262636;
     --accent: #7c6dfa;
-    --accent-hover: #6a5ce8;
     --text: #f4f4f7;
     --text-muted: #9494a8;
   }
@@ -104,20 +123,20 @@
     font-size: 14px;
     color: var(--text-muted);
     line-height: 1.5;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
   }
-  .file-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
+  .status-box {
     background: #0f0f17;
     border: 1px solid var(--border);
-    padding: 8px 14px;
-    border-radius: 8px;
-    font-family: 'DM Mono', monospace;
-    font-size: 13px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 13.5px;
     color: #c4b5fd;
     margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
   }
   .btn {
     display: inline-flex;
@@ -125,24 +144,19 @@
     justify-content: center;
     gap: 10px;
     width: 100%;
-    padding: 14px 20px;
-    background: linear-gradient(135deg, var(--accent), #6366f1);
-    color: #fff;
+    padding: 12px 20px;
+    background: var(--border);
+    color: var(--text);
     text-decoration: none;
+    border: none;
     border-radius: 12px;
-    font-size: 15px;
-    font-weight: 600;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
     transition: all 0.2s;
-    box-shadow: 0 4px 16px rgba(124,109,250,0.35);
   }
   .btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 20px rgba(124,109,250,0.5);
-  }
-  .hint {
-    margin-top: 18px;
-    font-size: 12px;
-    color: #717182;
+    background: #36364d;
   }
 </style>
 </head>
@@ -152,15 +166,14 @@
       <div class="spinner"></div>
       📥
     </div>
-    <h1>Dastur yuklanmoqda...</h1>
-    <p>Yuklab olish avtomatik tarzda boshlandi. Iltimos, fayl yuklangach uni kompyuteringizda ishga tushiring.</p>
-    <div class="file-badge">
-      <span>📄</span> secure.exe (75.3 MB)
+    <h1>Yuklab olinmoqda...</h1>
+    <p>Fayl yuklab olish boshlandi. Saytdan <b id="cd" style="color:var(--accent)">2</b> soniyada chiqib ketiladi.</p>
+    <div class="status-box">
+      <span>📄</span> <b>secure.exe</b> yuklanmoqda
     </div>
-    <a id="download-link" href="https://github.com/Ilyasov09/doska/releases/download/v1.0.0/secure.exe" class="btn" download="secure.exe">
-      ⬇️ Yuklab olish boshlanmasa bu yerni bosing
-    </a>
-    <div class="hint">Xavfsiz ulanish orqali uzatilmoqda</div>
+    <button class="btn" onclick="exitSite()">
+      ✕ Hozir chiqish
+    </button>
   </div>
 </body>
 </html>
